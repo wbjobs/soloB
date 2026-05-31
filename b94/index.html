@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC 门禁系统模拟器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NFC 门禁系统模拟器</h1>
+            <p>基于 Tauri v2 + Rust 的 ISO 14443 标准实现</p>
+        </header>
+
+        <div class="main-grid">
+            <div class="card card-section">
+                <h2>虚拟 NFC 卡片</h2>
+                <div class="card-info" id="cardInfo">
+                    <p><strong>UID:</strong> <span id="uid">点击生成</span></p>
+                    <p><strong>类型:</strong> <span id="uidType">-</span></p>
+                    <p><strong>SAK:</strong> <span id="sak">-</span></p>
+                    <p><strong>ATQA:</strong> <span id="atqa">-</span></p>
+                </div>
+                <button id="generateCardBtn" class="btn primary">生成新卡片</button>
+                
+                <div class="key-info">
+                    <h3>动态密钥 (基于逻辑帧计数器)</h3>
+                    <p class="key-display" id="keyDisplay">等待生成...</p>
+                    <p class="counter" id="keyCounter">帧计数器: -</p>
+                </div>
+                <button id="generateKeyBtn" class="btn secondary">生成密钥</button>
+                <button id="resetCounterBtn" class="btn danger">重置计数器</button>
+            </div>
+
+            <div class="reader-section">
+                <h2>读卡器模拟</h2>
+                <div class="reader-inputs">
+                    <div class="input-group">
+                        <label>读卡器 IP 地址</label>
+                        <select id="readerIp">
+                            <option value="192.168.1.100">读卡器 A (192.168.1.100)</option>
+                            <option value="192.168.1.101">读卡器 B (192.168.1.101)</option>
+                            <option value="192.168.1.102">读卡器 C (192.168.1.102)</option>
+                            <option value="127.0.0.1">本地读卡器</option>
+                        </select>
+                    </div>
+                    <button id="swipeBtn" class="btn primary swipe-btn">刷卡</button>
+                </div>
+
+                <div class="result-display" id="resultDisplay">
+                    <p class="result-title">刷卡结果</p>
+                    <div id="resultContent" class="result-content">
+                        <p class="waiting">等待刷卡...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-section">
+            <div class="alerts-section">
+                <div class="section-header">
+                    <h3>克隆检测告警</h3>
+                    <button id="clearAlertsBtn" class="btn small">清除告警</button>
+                </div>
+                <div class="alerts-list" id="alertsList">
+                    <p class="empty">暂无告警</p>
+                </div>
+            </div>
+
+            <div class="logs-section">
+                <div class="section-header">
+                    <h3>刷卡日志</h3>
+                    <button id="refreshLogsBtn" class="btn small">刷新</button>
+                    <button id="clearLogsBtn" class="btn small danger">清除日志</button>
+                </div>
+                <div class="logs-table-container">
+                    <table class="logs-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>UID</th>
+                                <th>读卡器IP</th>
+                                <th>状态</th>
+                                <th>克隆检测</th>
+                                <th>时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logsBody">
+                            <tr>
+                                <td colspan="6" class="empty">暂无日志</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="attack-section">
+            <div class="section-header attack-header">
+                <h2>🔓 卡片克隆攻击模拟</h2>
+                <span class="security-badge">安全测试专用</span>
+            </div>
+
+            <div class="attack-content">
+                <div class="attack-config">
+                    <h3>攻击配置</h3>
+                    <div class="config-grid">
+                        <div class="input-group">
+                            <label>攻击名称</label>
+                            <input type="text" id="attackName" value="标准克隆攻击测试" placeholder="输入攻击名称">
+                        </div>
+                        <div class="input-group">
+                            <label>攻击类型</label>
+                            <select id="attackType">
+                                <option value="simultaneous">同时刷卡攻击</option>
+                                <option value="rapid">快速连续刷卡</option>
+                                <option value="multi_reader">多读卡器漫游攻击</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>目标卡片 UID</label>
+                            <input type="text" id="targetUid" readonly placeholder="先生成卡片">
+                        </div>
+                        <div class="input-group">
+                            <label>攻击轮数</label>
+                            <input type="number" id="numAttempts" value="3" min="1" max="10">
+                        </div>
+                        <div class="input-group full-width">
+                            <label>参与攻击的读卡器（多选）</label>
+                            <div class="reader-checkboxes">
+                                <label><input type="checkbox" value="192.168.1.100" checked> 读卡器 A (192.168.1.100)</label>
+                                <label><input type="checkbox" value="192.168.1.101" checked> 读卡器 B (192.168.1.101)</label>
+                                <label><input type="checkbox" value="192.168.1.102"> 读卡器 C (192.168.1.102)</label>
+                                <label><input type="checkbox" value="127.0.0.1"> 本地读卡器</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="attack-buttons">
+                        <button id="startAttackBtn" class="btn attack-btn">🚀 发起克隆攻击</button>
+                        <button id="clearAttackHistoryBtn" class="btn small danger">清空攻击历史</button>
+                    </div>
+                </div>
+
+                <div class="attack-results">
+                    <h3>攻击报告</h3>
+                    <div id="attackReportContent" class="report-content">
+                        <p class="waiting">等待发起攻击...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="attack-history-section">
+                <div class="section-header">
+                    <h3>攻击历史记录</h3>
+                    <button id="refreshHistoryBtn" class="btn small">刷新</button>
+                </div>
+                <div class="history-table-container">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>报告ID</th>
+                                <th>攻击名称</th>
+                                <th>类型</th>
+                                <th>目标UID</th>
+                                <th>检测率</th>
+                                <th>时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody">
+                            <tr>
+                                <td colspan="7" class="empty">暂无攻击记录</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
