@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model RecordingSession {
+  id        String   @id @default(uuid())
+  title     String
+  startedAt DateTime
+  endedAt   DateTime?
+  duration  Int?
+  status    String   @default("recording")
+  videoPath String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  segments       VideoSegment[]
+  subtitles      Subtitle[]
+  processingTasks ProcessingTask[]
+}
+
+model VideoSegment {
+  id            String           @id @default(uuid())
+  sessionId     String
+  segmentNumber Int
+  startTime     Int
+  duration      Int?
+  filePath      String
+  sizeBytes     Int?
+  createdAt     DateTime         @default(now())
+
+  session   RecordingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subtitles Subtitle[]
+}
+
+model Subtitle {
+  id         String        @id @default(uuid())
+  sessionId  String
+  segmentId  String?
+  startTime  Float
+  endTime    Float
+  textZh     String
+  textEn     String
+  isEdited   Boolean       @default(false)
+  source     String        @default("whisper")
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  session RecordingSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  segment VideoSegment?     @relation(fields: [segmentId], references: [id], onDelete: SetNull)
+  edits   CaptionEdit[]
+}
+
+model LiveCaption {
+  id            String   @id @default(uuid())
+  sessionId     String
+  audioChunkId  String?
+  startTime     Float
+  endTime       Float
+  textZh        String
+  textEn        String?
+  confidence    Float?
+  isEdited      Boolean  @default(false)
+  status        String   @default("pending")
+  processingAt  DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  session RecordingSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  audioChunk AudioChunk?    @relation(fields: [audioChunkId], references: [id], onDelete: SetNull)
+  edits      CaptionEdit[]
+}
+
+model AudioChunk {
+  id            String   @id @default(uuid())
+  sessionId     String
+  filePath      String
+  startTime     Float
+  endTime       Float
+  duration      Float
+  sizeBytes     Int?
+  status        String   @default("pending")
+  transcription String?
+  createdAt     DateTime @default(now())
+  processedAt   DateTime?
+
+  session       RecordingSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  liveCaptions  LiveCaption[]
+}
+
+model CaptionEdit {
+  id            String   @id @default(uuid())
+  sessionId     String
+  subtitleId    String?
+  liveCaptionId String?
+  originalTextZh String
+  editedTextZh  String
+  originalTextEn String?
+  editedTextEn  String?
+  editedBy      String?
+  editedAt      DateTime @default(now())
+
+  session      RecordingSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  subtitle     Subtitle?         @relation(fields: [subtitleId], references: [id], onDelete: SetNull)
+  liveCaption  LiveCaption?      @relation(fields: [liveCaptionId], references: [id], onDelete: SetNull)
+}
+
+model ProcessingTask {
+  id            String   @id @default(uuid())
+  sessionId     String
+  type          String
+  status        String   @default("pending")
+  progress      Int      @default(0)
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  completedAt   DateTime?
+
+  session RecordingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
