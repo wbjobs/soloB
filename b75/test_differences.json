@@ -1,0 +1,210 @@
+{
+  "alignment": {
+    "sequence1": "ATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCGATCG",
+    "match_line": "││╳││││││││╳││││││││││╳││││││││╳││││││││││││││╳││││││││╳││││││││││││││││││││││││",
+    "sequence2": "ATGGATCGATCCATCGATCGATGGATCGATCCATCGATCGATCGATGGATCGATCCATCGATCGATCGATCGATCGATCG"
+  },
+  "differences": [
+    {
+      "alignment_position": 2,
+      "sequence1_position": 3,
+      "sequence2_position": 3,
+      "base1": "C",
+      "base2": "G",
+      "type": "substitution"
+    },
+    {
+      "alignment_position": 11,
+      "sequence1_position": 12,
+      "sequence2_position": 12,
+      "base1": "G",
+      "base2": "C",
+      "type": "substitution"
+    },
+    {
+      "alignment_position": 22,
+      "sequence1_position": 23,
+      "sequence2_position": 23,
+      "base1": "C",
+      "base2": "G",
+      "type": "substitution"
+    },
+    {
+      "alignment_position": 31,
+      "sequence1_position": 32,
+      "sequence2_position": 32,
+      "base1": "G",
+      "base2": "C",
+      "type": "substitution"
+    },
+    {
+      "alignment_position": 46,
+      "sequence1_position": 47,
+      "sequence2_position": 47,
+      "base1": "C",
+      "base2": "G",
+      "type": "substitution"
+    },
+    {
+      "alignment_position": 55,
+      "sequence1_position": 56,
+      "sequence2_position": 56,
+      "base1": "G",
+      "base2": "C",
+      "type": "substitution"
+    }
+  ],
+  "statistics": {
+    "alignment_length": 80,
+    "matches": 74,
+    "mismatches": 6,
+    "total_gaps": 0,
+    "gaps_in_sequence1": 0,
+    "gaps_in_sequence2": 0,
+    "identity_percentage": 92.5,
+    "match_score": 142
+  },
+  "heatmap_data": {
+    "window_size": 10,
+    "mutation_density": [
+      {
+        "window_start": 0,
+        "window_end": 9,
+        "mutation_count": 1,
+        "window_size": 10,
+        "density": 0.1
+      },
+      {
+        "window_start": 10,
+        "window_end": 19,
+        "mutation_count": 1,
+        "window_size": 10,
+        "density": 0.1
+      },
+      {
+        "window_start": 20,
+        "window_end": 29,
+        "mutation_count": 1,
+        "window_size": 10,
+        "density": 0.1
+      },
+      {
+        "window_start": 30,
+        "window_end": 39,
+        "mutation_count": 1,
+        "window_size": 10,
+        "density": 0.1
+      },
+      {
+        "window_start": 40,
+        "window_end": 49,
+        "mutation_count": 1,
+        "window_size": 10,
+        "density": 0.1
+      },
+      {
+        "window_start": 50,
+        "window_end": 59,
+        "mutation_count": 1,
+        "window_size": 10,
+        "density": 0.1
+      },
+      {
+        "window_start": 60,
+        "window_end": 69,
+        "mutation_count": 0,
+        "window_size": 10,
+        "density": 0.0
+      },
+      {
+        "window_start": 70,
+        "window_end": 79,
+        "mutation_count": 0,
+        "window_size": 10,
+        "density": 0.0
+      }
+    ],
+    "per_base_mutation": [
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  }
+}
