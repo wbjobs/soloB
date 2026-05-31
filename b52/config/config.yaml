@@ -1,0 +1,18 @@
+server:
+  port: 8080
+  read_timeout: 10s
+  write_timeout: 10s
+
+limiter:
+  strategy: "token_bucket"
+  rate: 100
+  capacity: 500
+  window: 1s
+
+circuit_breaker:
+  error_threshold: 0.5
+  timeout: 30s
+  window_size: 100
+
+proxy:
+  target: "http://localhost:8081"
