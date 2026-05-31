@@ -1,0 +1,17 @@
+import os
+
+MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
+MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "tech_docs")
+
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+EMBEDDING_DIM = 384
+
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama2")
+
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 50
+TOP_K_RESULTS = 4
+RELEVANCE_THRESHOLD = 0.4
+MEMORY_TURNS = 3

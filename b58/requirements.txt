@@ -1,0 +1,10 @@
+streamlit==1.32.2
+langchain==0.1.13
+langchain-community==0.0.29
+langchain-core==0.1.33
+pymilvus==2.4.0
+sentence-transformers==2.6.1
+pypdf==4.2.0
+python-dotenv==1.0.1
+faiss-cpu==1.8.0
+numpy==1.26.4
