@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时加密货币交易大屏</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 12px;
+            gap: 12px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: #161b22;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+        }
+        .header .title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #58a6ff;
+        }
+        .stats {
+            display: flex;
+            gap: 30px;
+        }
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .stat-label {
+            font-size: 11px;
+            color: #8b949e;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        .price-up { color: #3fb950; }
+        .price-down { color: #f85149; }
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+        .status-dot.connected {
+            background: #3fb950;
+        }
+        .status-dot.disconnected {
+            background: #f85149;
+            animation: none;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .main-content {
+            display: flex;
+            flex: 1;
+            gap: 12px;
+            min-height: 0;
+        }
+        .left-panel {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+        }
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+        }
+        .panel {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .panel-header {
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-content {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        select, button {
+            background: #21262d;
+            color: #e6edf3;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        select:hover, button:hover {
+            background: #30363d;
+        }
+        button.active {
+            background: #1f6feb;
+            border-color: #1f6feb;
+        }
+        .info-row {
+            display: flex;
+            gap: 20px;
+            font-size: 11px;
+            color: #8b949e;
+        }
+
+        .depth-chart-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        .depth-chart-container .chart {
+            flex: 1;
+            min-height: 0;
+        }
+        .spread-info {
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 0 0;
+            border-top: 1px solid #30363d;
+            margin-top: 8px;
+        }
+        .spread-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .spread-item .label {
+            font-size: 10px;
+            color: #8b949e;
+        }
+        .spread-item .value {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .spread-item .value.ask {
+            color: #f85149;
+        }
+        .spread-item .value.bid {
+            color: #3fb950;
+        }
+
+        .trades-list {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        .trades-table th, .trades-table td {
+            padding: 4px 8px;
+            text-align: right;
+            border-bottom: 1px solid #21262d;
+        }
+        .trades-table th {
+            color: #8b949e;
+            font-weight: normal;
+            position: sticky;
+            top: 0;
+            background: #161b22;
+        }
+        .trades-table td:first-child, .trades-table th:first-child {
+            text-align: left;
+        }
+        .trades-table tr.buy td:nth-child(2) { color: #3fb950; }
+        .trades-table tr.sell td:nth-child(2) { color: #f85149; }
+        .trades-list::-webkit-scrollbar { width: 4px; }
+        .trades-list::-webkit-scrollbar-track { background: #21262d; }
+        .trades-list::-webkit-scrollbar-thumb { background: #484f58; border-radius: 2px; }
+
+        .orderbook {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            font-size: 11px;
+        }
+        .orderbook-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .orderbook-side.asks { flex-direction: column-reverse; }
+        .orderbook-header {
+            color: #8b949e;
+            padding: 4px 8px;
+            border-bottom: 1px solid #30363d;
+            font-size: 10px;
+        }
+        .orderbook-side.asks .orderbook-header { border-top: 1px solid #30363d; border-bottom: none; }
+        .orderbook-rows {
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+        .orderbook-row {
+            display: flex;
+            align-items: center;
+            padding: 2px 8px;
+            position: relative;
+            gap: 8px;
+        }
+        .orderbook-row .bar-ask, .orderbook-row .bar-bid {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            opacity: 0.2;
+            z-index: 0;
+        }
+        .orderbook-row .bar-ask { background: #f85149; }
+        .orderbook-row .bar-bid { background: #3fb950; }
+        .orderbook-row .price, .orderbook-row .qty {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            text-align: right;
+        }
+        .orderbook-row .price {
+            color: #8b949e;
+        }
+        .orderbook-side.asks .orderbook-row .price { color: #f85149; }
+        .orderbook-side.bids .orderbook-row .price { color: #3fb950; }
+        .orderbook-rows::-webkit-scrollbar { width: 4px; }
+        .orderbook-rows::-webkit-scrollbar-track { background: #21262d; }
+        .orderbook-rows::-webkit-scrollbar-thumb { background: #484f58; border-radius: 2px; }
+
+        .orderbook-divider {
+            height: 1px;
+            background: #30363d;
+            margin: 4px 0;
+        }
+        .indicator-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-left: 15px;
+            padding-left: 15px;
+            border-left: 1px solid #30363d;
+        }
+        .indicator-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            padding: 3px 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .indicator-btn.active {
+            background: #1f6feb;
+            border-color: #1f6feb;
+        }
+        .indicator-btn .color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .indicator-settings-panel {
+            position: absolute;
+            top: 35px;
+            right: 20px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 12px;
+            z-index: 100;
+            min-width: 220px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .indicator-settings-panel h4 {
+            font-size: 12px;
+            color: #58a6ff;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #30363d;
+        }
+        .param-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .param-row label {
+            font-size: 11px;
+            color: #8b949e;
+        }
+        .param-row input {
+            width: 60px;
+            background: #21262d;
+            color: #e6edf3;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 11px;
+        }
+        .panel-close {
+            position: absolute;
+            top: 8px;
+            right: 10px;
+            color: #8b949e;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .panel-close:hover {
+            color: #e6edf3;
+        }
+        .settings-btn {
+            font-size: 10px;
+            padding: 3px 6px;
+            margin-left: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="dashboard">
+            <div class="header">
+                <div class="title">BTC/USDT 实时交易大屏</div>
+                <div class="stats">
+                    <div class="stat-item">
+                        <span class="stat-label">当前价格</span>
+                        <span class="stat-value" :class="priceChange >= 0 ? 'price-up' : 'price-down'">
+                            ${{ currentPrice.toFixed(2) }}
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">涨跌幅</span>
+                        <span class="stat-value" :class="priceChange >= 0 ? 'price-up' : 'price-down'">
+                            {{ priceChange >= 0 ? '+' : '' }}{{ priceChange.toFixed(2) }}%
+                        </span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">K线数量</span>
+                        <span class="stat-value">{{ candleCount }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Tick 数量</span>
+                        <span class="stat-value">{{ tickCount.toLocaleString() }}</span>
+                    </div>
+                    <div class="stat-item" v-if="downsampleInterval > 1">
+                        <span class="stat-label">降采样</span>
+                        <span class="stat-value">{{ downsampleInterval }}:1</span>
+                    </div>
+                </div>
+                <div class="status">
+                    <span class="status-dot" :class="connected ? 'connected' : 'disconnected'"></span>
+                    <span>{{ connected ? '已连接' : '已断开' }}</span>
+                </div>
+            </div>
+
+            <div class="main-content">
+                <div class="left-panel">
+                    <div class="panel" style="flex: 2; position: relative;">
+                        <div class="panel-header">
+                            <span>K 线图 (Candlestick)</span>
+                            <div class="controls">
+                                <span class="info-row">
+                                    <span>K线周期:</span>
+                                </span>
+                                <button 
+                                    v-for="(option, key) in intervalOptions" 
+                                    :key="key"
+                                    @click="changeInterval(key)"
+                                    :class="{ active: selectedInterval === key }"
+                                >
+                                    {{ option.label }}
+                                </button>
+                                <div class="indicator-controls">
+                                    <template v-for="(indicator, key) in indicatorList" :key="key">
+                                        <button 
+                                            class="indicator-btn"
+                                            :class="{ active: indicator.enabled }"
+                                            @click="toggleIndicator(key)"
+                                        >
+                                            <span class="color-dot" :style="{ backgroundColor: indicator.color }"></span>
+                                            {{ indicator.label }}
+                                        </button>
+                                        <button 
+                                            v-if="indicator.enabled"
+                                            class="settings-btn"
+                                            @click="openIndicatorSettings(key)"
+                                            title="参数设置"
+                                        >⚙️</button>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="indicator-settings-panel" v-if="activeSettingsIndicator">
+                            <span class="panel-close" @click="closeIndicatorSettings">✕</span>
+                            <h4>{{ getIndicatorLabel(activeSettingsIndicator) }} 参数设置</h4>
+                            <div 
+                                v-for="(value, key) in indicatorParams[activeSettingsIndicator]" 
+                                :key="key"
+                                class="param-row"
+                            >
+                                <label>{{ getParamLabel(activeSettingsIndicator, key) }}</label>
+                                <input 
+                                    type="number" 
+                                    :value="value"
+                                    @input="updateIndicatorParam(activeSettingsIndicator, key, $event)"
+                                    min="1"
+                                />
+                            </div>
+                        </div>
+                        <div class="panel-content">
+                            <div ref="klineChartRef" style="width: 100%; height: 100%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="panel" style="flex: 1;">
+                        <div class="panel-header">
+                            <span>最近成交记录</span>
+                        </div>
+                        <div class="trades-list">
+                            <table class="trades-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>价格</th>
+                                        <th>数量</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="trade in recentTrades" :key="trade.timestamp" :class="trade.side">
+                                        <td>{{ formatTradeTime(trade.timestamp) }}</td>
+                                        <td>{{ trade.price.toFixed(2) }}</td>
+                                        <td>{{ trade.quantity.toFixed(4) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right-panel">
+                    <div class="panel" style="flex: 1;">
+                        <div class="panel-header">
+                            <span>深度图 (Order Book)</span>
+                        </div>
+                        <div class="panel-content">
+                            <div class="depth-chart-container">
+                                <div ref="depthChartRef" class="chart"></div>
+                                <div class="spread-info">
+                                    <div class="spread-item">
+                                        <span class="label">卖一价 (Ask)</span>
+                                        <span class="value ask">{{ askPrice }}</span>
+                                    </div>
+                                    <div class="spread-item">
+                                        <span class="label">价差</span>
+                                        <span class="value">{{ spread }}</span>
+                                    </div>
+                                    <div class="spread-item">
+                                        <span class="label">买一价 (Bid)</span>
+                                        <span class="value bid">{{ bidPrice }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel" style="flex: 1;">
+                        <div class="panel-header">
+                            <span>订单簿</span>
+                        </div>
+                        <div class="orderbook">
+                            <div class="orderbook-side asks">
+                                <div class="orderbook-header">卖单 (Asks)</div>
+                                <div class="orderbook-rows">
+                                    <div v-for="(order, idx) in orderbookAsks" :key="'a' + idx" class="orderbook-row">
+                                        <div class="bar-ask" :style="{ width: getBarWidth(order.quantity, maxAskQty) + '%' }"></div>
+                                        <span class="price">{{ order.price.toFixed(2) }}</span>
+                                        <span class="qty">{{ order.quantity.toFixed(4) }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="orderbook-divider"></div>
+                            <div class="orderbook-side bids">
+                                <div class="orderbook-rows">
+                                    <div v-for="(order, idx) in orderbookBids" :key="'b' + idx" class="orderbook-row">
+                                        <div class="bar-bid" :style="{ width: getBarWidth(order.quantity, maxBidQty) + '%' }"></div>
+                                        <span class="price">{{ order.price.toFixed(2) }}</span>
+                                        <span class="qty">{{ order.quantity.toFixed(4) }}</span>
+                                    </div>
+                                </div>
+                                <div class="orderbook-header">买单 (Bids)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./chart_manager.js"></script>
+    <script src="./app.js"></script>
+</body>
+</html>
