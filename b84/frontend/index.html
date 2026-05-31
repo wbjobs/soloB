@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>地质体三维建模工具 - LOD版</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <div class="sidebar">
+      <h1>地质体三维建模工具</h1>
+      
+      <div class="section performance-stats">
+        <h3>性能监控</h3>
+        <div class="stats-grid">
+          <span id="fpsCounter">FPS: --</span>
+          <span id="vertexCount">顶点: 0</span>
+          <span id="triangleCount">三角形: 0</span>
+          <span id="chunkCount">分块: 0</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>数据管理</h3>
+        <div class="form-group">
+          <label>钻孔数量:</label>
+          <input type="number" id="boreholeCount" value="50" min="10" max="1000">
+        </div>
+        <button id="loadSampleBtn" class="btn">加载示例钻孔数据</button>
+        <button id="clearAllBtn" class="btn btn-danger">清空所有</button>
+        <div id="boreholeList" class="borehole-list"></div>
+      </div>
+
+      <div class="section">
+        <h3>地层生成</h3>
+        <div class="form-group">
+          <label>插值方法:</label>
+          <select id="interpolationMethod">
+            <option value="kriging">克里金插值</option>
+            <option value="idw">反距离加权</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>地层序号:</label>
+          <input type="number" id="stratIndex" value="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>网格大小 (m):</label>
+          <input type="number" id="gridSize" value="10" min="1">
+        </div>
+        <div class="form-group checkbox">
+          <input type="checkbox" id="enableStreaming" checked>
+          <label>启用流式加载</label>
+        </div>
+        <div class="progress-bar-container">
+          <div id="loadingProgress" class="progress-bar" style="width: 0%">0%</div>
+        </div>
+        <button id="generateSurfaceBtn" class="btn btn-primary">生成地层曲面</button>
+      </div>
+
+      <div class="section">
+        <h3>地质剖面</h3>
+        <div class="form-group">
+          <label>起点 X:</label>
+          <input type="number" id="sectionStartX" value="100">
+          <label>起点 Y:</label>
+          <input type="number" id="sectionStartY" value="100">
+        </div>
+        <div class="form-group">
+          <label>终点 X:</label>
+          <input type="number" id="sectionEndX" value="400">
+          <label>终点 Y:</label>
+          <input type="number" id="sectionEndY" value="300">
+        </div>
+        <button id="generateSectionBtn" class="btn">生成地质剖面</button>
+      </div>
+
+      <div class="section">
+        <h3>虚拟钻探</h3>
+        <div class="info-box">
+          <p>💡 在3D场景中点击任意位置进行虚拟钻探</p>
+        </div>
+        <div class="form-group">
+          <label>插值方法:</label>
+          <select id="drillMethod">
+            <option value="kriging">克里金插值</option>
+            <option value="idw">反距离加权</option>
+          </select>
+        </div>
+        <button id="clearDrillMarkersBtn" class="btn btn-danger">清除钻探标记</button>
+      </div>
+
+      <div class="section">
+        <h3>体积计算</h3>
+        <button id="calculateVolumeBtn" class="btn">计算矿体体积</button>
+      </div>
+
+      <div class="section">
+        <h3>导出</h3>
+        <button id="exportGLTFBtn" class="btn">导出 GLTF</button>
+      </div>
+
+      <div class="section">
+        <h3>视图控制</h3>
+        <button id="resetViewBtn" class="btn">重置视图</button>
+        <button id="toggleWireframeBtn" class="btn">切换线框</button>
+      </div>
+    </div>
+
+    <div class="viewport">
+      <canvas id="threeCanvas"></canvas>
+      <div id="sectionOverlay" class="section-overlay hidden">
+        <canvas id="sectionCanvas"></canvas>
+        <button id="closeSectionBtn" class="close-btn">×</button>
+      </div>
+      <div id="drillOverlay" class="drill-overlay hidden">
+        <div class="drill-header">
+          <h3>🔍 虚拟钻探结果</h3>
+          <button id="closeDrillBtn" class="close-btn">×</button>
+        </div>
+        <div class="drill-info">
+          <div class="info-row">
+            <span class="label">位置坐标:</span>
+            <span id="drillCoords" class="value">--</span>
+          </div>
+          <div class="info-row">
+            <span class="label">地表高程:</span>
+            <span id="drillElevation" class="value">--</span>
+          </div>
+          <div class="info-row">
+            <span class="label">最近钻孔:</span>
+            <span id="drillNearest" class="value">--</span>
+          </div>
+          <div class="info-row">
+            <span class="label">最近距离:</span>
+            <span id="drillDistance" class="value">--</span>
+          </div>
+        </div>
+        <div class="confidence-section">
+          <div class="confidence-label">综合置信度:</div>
+          <div class="confidence-bar-container">
+            <div id="confidenceBar" class="confidence-bar"></div>
+          </div>
+          <span id="confidenceValue" class="confidence-value">0%</span>
+        </div>
+        <div class="lithology-column-container">
+          <h4>岩性柱状图</h4>
+          <div id="lithologyColumn" class="lithology-column"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
