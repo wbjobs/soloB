@@ -1,0 +1,40 @@
+mqtt:
+  broker: "tcp://localhost:1883"
+  topic: "meters/+/data"
+  client_id: "iiothub-consumer"
+  qos: 1
+  cache_capacity: 100000
+  persistence_dir: "./mqtt_persistence"
+
+prediction:
+  enabled: true
+  window_size: 96
+  prediction_steps: 4
+  interval_minutes: 15
+  historical_days: 7
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "postgres"
+  dbname: "iiothub"
+  retention_days: 90
+
+aggregation:
+  window_minutes: 5
+
+anomaly_detection:
+  enabled: true
+  threshold: 0.7
+  num_trees: 100
+  sample_size: 256
+  webhook_url: "http://localhost:8080/webhook"
+  webhook_enabled: true
+
+api:
+  port: 8080
+
+simulator:
+  num_meters: 1000
+  interval_ms: 10000

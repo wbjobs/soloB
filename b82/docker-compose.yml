@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: timescale/timescaledb:2.13.0-pg15
+    container_name: iiothub-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=iiothub
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iiothub-network
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0.18
+    container_name: iiothub-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./configs/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 2 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - iiothub-network
+
+  iiothub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iiothub-server
+    ports:
+      - "8080:8080"
+    environment:
+      - MQTT_BROKER=tcp://mosquitto:1883
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=iiothub
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs
+    networks:
+      - iiothub-network
+    restart: unless-stopped
+
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile.simulator
+    container_name: iiothub-simulator
+    environment:
+      - MQTT_BROKER=tcp://mosquitto:1883
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - ./configs:/app/configs
+    networks:
+      - iiothub-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:
+
+networks:
+  iiothub-network:
+    driver: bridge
