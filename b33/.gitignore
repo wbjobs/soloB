@@ -1,0 +1,13 @@
+funnelservice
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+/go.sum
+/vendor/
+.idea/
+.vscode/
+*.log
