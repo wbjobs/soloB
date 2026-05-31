@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D点云处理与可视化工具链</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #e4e4e7;
+        }
+
+        header {
+            background: rgba(15, 23, 42, 0.95);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            padding: 1rem 2rem;
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa, #f472b6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            margin-top: 0.25rem;
+        }
+
+        .container {
+            display: flex;
+            gap: 1.5rem;
+            padding: 1.5rem;
+            height: calc(100vh - 88px);
+        }
+
+        .sidebar {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 12px;
+            padding: 1.25rem;
+        }
+
+        .card-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(180deg, #60a5fa, #a78bfa);
+            border-radius: 2px;
+        }
+
+        .viewer-container {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.15);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .viewer-toolbar {
+            background: rgba(30, 41, 59, 0.9);
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        #viewer {
+            flex: 1;
+            min-height: 400px;
+        }
+
+        .placeholder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .placeholder-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(71, 85, 105, 0.6);
+            color: #e2e8f0;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(100, 116, 139, 0.6);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.625rem 0.875rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 0.875rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+        }
+
+        .file-list {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .file-item {
+            padding: 0.75rem;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .file-item:hover {
+            background: rgba(15, 23, 42, 0.6);
+            border-color: rgba(96, 165, 250, 0.3);
+        }
+
+        .file-item.active {
+            border-color: #60a5fa;
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        .file-name {
+            font-size: 0.875rem;
+            color: #e2e8f0;
+            margin-bottom: 0.25rem;
+        }
+
+        .file-meta {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .progress {
+            display: none;
+            margin-top: 1rem;
+        }
+
+        .progress.visible {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: rgba(71, 85, 105, 0.5);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #60a5fa, #a78bfa);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .progress-text {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+        }
+
+        .instructions {
+            font-size: 0.8rem;
+            color: #64748b;
+            line-height: 1.6;
+        }
+
+        .instructions ul {
+            margin-left: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .instructions li {
+            margin-bottom: 0.25rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.625rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 0.5rem;
+        }
+
+        .badge-models {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+
+        .badge-outputs {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            background: rgba(30, 41, 59, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            z-index: 1000;
+            display: none;
+            max-width: 400px;
+        }
+
+        .toast.visible {
+            display: block;
+        }
+
+        .toast.success {
+            border-color: #34d399;
+        }
+
+        .toast.error {
+            border-color: #f87171;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>3D点云处理与可视化工具链</h1>
+        <p class="subtitle">基于体素网格下采样 + Potree 渲染</p>
+    </header>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="card">
+                <h3 class="card-title">上传点云</h3>
+                <label class="btn btn-primary" style="width: 100%; justify-content: center;">
+                    <span>📁 选择文件</span>
+                    <input type="file" id="fileInput" accept=".ply,.pcd,.xyz,.xyzrgb,.pts">
+                </label>
+                <div class="progress" id="uploadProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="uploadFill"></div>
+                    </div>
+                    <div class="progress-text" id="uploadText">正在上传...</div>
+                </div>
+                <div class="instructions" style="margin-top: 1rem;">
+                    支持格式: .ply, .pcd, .xyz, .xyzrgb, .pts
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">点云简化</h3>
+                <div class="form-group">
+                    <label class="form-label">选择源文件</label>
+                    <select class="form-input" id="sourceSelect">
+                        <option value="">请先上传或刷新文件列表</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">目标点数</label>
+                    <input type="number" class="form-input" id="targetPoints" value="10000" min="100" step="100">
+                </div>
+                <button class="btn btn-success" id="simplifyBtn" disabled style="width: 100%;">
+                    <span>⚡ 开始简化</span>
+                </button>
+                <div class="progress" id="simplifyProgress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="simplifyFill"></div>
+                    </div>
+                    <div class="progress-text" id="simplifyText">正在处理...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">文件列表</h3>
+                <button class="btn btn-secondary" id="refreshBtn" style="width: 100%; margin-bottom: 1rem;">
+                    <span>🔄 刷新列表</span>
+                </button>
+                <ul class="file-list" id="fileList">
+                    <li style="color: #64748b; font-size: 0.875rem; padding: 0.5rem;">暂无文件</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3 class="card-title">CLI 使用指南</h3>
+                <div class="instructions">
+                    <strong>cloud-simplify 命令:</strong>
+                    <ul>
+                        <li><code>cloud-simplify input.ply -o output.ply -n 10000</code></li>
+                        <li><code>cloud-simplify input.pcd -o output.ply -v 0.05</code></li>
+                    </ul>
+                    <strong>参数说明:</strong>
+                    <ul>
+                        <li><code>-n, --num-points</code>: 目标点数</li>
+                        <li><code>-v, --voxel-size</code>: 体素大小</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="viewer-container">
+            <div class="viewer-toolbar">
+                <span style="color: #94a3b8; font-size: 0.875rem;">当前加载: <span id="currentFile">无</span></span>
+                <button class="btn btn-secondary" id="resetView" disabled>重置视角</button>
+                <button class="btn btn-secondary" id="togglePoints" disabled>显示/隐藏点</button>
+            </div>
+            <div id="viewer">
+                <div class="placeholder" id="placeholder">
+                    <div class="placeholder-icon">🎯</div>
+                    <h3 style="margin-bottom: 0.5rem;">选择文件以开始可视化</h3>
+                    <p style="color: #64748b;">从左侧列表中选择一个 .ply 或 .pcd 文件来加载</p>
+                    <div class="instructions" style="margin-top: 1.5rem; text-align: left;">
+                        <strong>操作说明:</strong>
+                        <ul>
+                            <li>左键拖拽: 旋转视角</li>
+                            <li>滚轮: 缩放</li>
+                            <li>右键拖拽: 平移</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/PLYLoader.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, pointCloud;
+        let currentFilePath = null;
+
+        function initViewer() {
+            const viewer = document.getElementById('viewer');
+            const placeholder = document.getElementById('placeholder');
+            
+            if (placeholder) {
+                placeholder.style.display = 'none';
+            }
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0f172a);
+
+            const aspect = viewer.clientWidth / viewer.clientHeight;
+            camera = new THREE.PerspectiveCamera(60, aspect, 0.01, 1000);
+            camera.position.set(0, 2, 5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            viewer.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = true;
+            controls.minDistance = 0.01;
+            controls.maxDistance = 1000;
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+
+            const gridHelper = new THREE.GridHelper(10, 20, 0x334155, 0x1e293b);
+            scene.add(gridHelper);
+
+            const axesHelper = new THREE.AxesHelper(5);
+            scene.add(axesHelper);
+
+            window.addEventListener('resize', onWindowResize);
+            
+            animate();
+
+            document.getElementById('resetView').disabled = false;
+            document.getElementById('togglePoints').disabled = false;
+        }
+
+        function onWindowResize() {
+            const viewer = document.getElementById('viewer');
+            if (camera && renderer) {
+                camera.aspect = viewer.clientWidth / viewer.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) controls.update();
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        function loadPointCloud(filePath) {
+            if (!scene) {
+                initViewer();
+            }
+
+            if (pointCloud) {
+                scene.remove(pointCloud);
+                pointCloud.geometry.dispose();
+                pointCloud.material.dispose();
+                pointCloud = null;
+            }
+
+            showToast('正在加载点云...');
+
+            const ext = filePath.split('.').pop().toLowerCase();
+            const loader = new THREE.PLYLoader();
+
+            loader.load(
+                filePath,
+                function(geometry) {
+                    geometry.computeVertexNormals();
+                    geometry.center();
+
+                    const material = new THREE.PointsMaterial({
+                        size: 0.02,
+                        vertexColors: true,
+                        sizeAttenuation: true
+                    });
+
+                    pointCloud = new THREE.Points(geometry, material);
+                    scene.add(pointCloud);
+
+                    const bbox = new THREE.Box3().setFromObject(pointCloud);
+                    const center = bbox.getCenter(new THREE.Vector3());
+                    const size = bbox.getSize(new THREE.Vector3());
+                    
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const fov = camera.fov * (Math.PI / 180);
+                    const cameraZ = Math.abs(maxDim / 2 * Math.tan(fov * 2));
+                    
+                    camera.position.set(center.x, center.y + maxDim * 0.5, center.z + cameraZ * 1.5);
+                    camera.lookAt(center);
+                    controls.target.copy(center);
+                    controls.update();
+
+                    const pointCount = geometry.attributes.position.count;
+                    document.getElementById('currentFile').textContent = 
+                        `${filePath.split('/').pop()} (${pointCount.toLocaleString()} 点)`;
+                    currentFilePath = filePath;
+
+                    showToast('点云加载成功！', 'success');
+                },
+                function(xhr) {
+                    const percent = (xhr.loaded / xhr.total * 100).toFixed(1);
+                    document.getElementById('currentFile').textContent = 
+                        `加载中... ${percent}%`;
+                },
+                function(error) {
+                    showToast('加载失败: ' + error.message, 'error');
+                }
+            );
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast visible ${type}`;
+            setTimeout(() => {
+                toast.className = 'toast';
+            }, 3000);
+        }
+
+        async function refreshFileList() {
+            try {
+                const response = await fetch('/api/files');
+                const files = await response.json();
+                
+                const listEl = document.getElementById('fileList');
+                const selectEl = document.getElementById('sourceSelect');
+                
+                listEl.innerHTML = '';
+                selectEl.innerHTML = '';
+
+                if (files.length === 0) {
+                    listEl.innerHTML = '<li style="color: #64748b; font-size: 0.875rem; padding: 0.5rem;">暂无文件</li>';
+                    selectEl.innerHTML = '<option value="">无可用文件</option>';
+                    document.getElementById('simplifyBtn').disabled = true;
+                    return;
+                }
+
+                files.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+                files.forEach(file => {
+                    const li = document.createElement('li');
+                    li.className = 'file-item';
+                    li.innerHTML = `
+                        <div class="file-name">
+                            ${file.name}
+                            <span class="badge badge-${file.type}">${file.type}</span>
+                        </div>
+                        <div class="file-meta">
+                            ${(file.size / 1024).toFixed(1)} KB · ${new Date(file.createdAt).toLocaleString()}
+                        </div>
+                    `;
+                    li.addEventListener('click', () => {
+                        document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+                        li.classList.add('active');
+                        loadPointCloud(file.path);
+                    });
+                    listEl.appendChild(li);
+
+                    const option = document.createElement('option');
+                    option.value = file.path;
+                    option.textContent = `${file.name} (${file.type})`;
+                    selectEl.appendChild(option);
+                });
+
+                document.getElementById('simplifyBtn').disabled = false;
+            } catch (error) {
+                showToast('获取文件列表失败', 'error');
+            }
+        }
+
+        document.getElementById('fileInput').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const progress = document.getElementById('uploadProgress');
+            const fill = document.getElementById('uploadFill');
+            const text = document.getElementById('uploadText');
+            
+            progress.classList.add('visible');
+            fill.style.width = '30%';
+            text.textContent = '正在上传...';
+
+            const formData = new FormData();
+            formData.append('pointcloud', file);
+
+            try {
+                fill.style.width = '60%';
+                text.textContent = '上传中...';
+
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('上传失败');
+                }
+
+                fill.style.width = '100%';
+                text.textContent = '上传完成';
+
+                setTimeout(() => {
+                    progress.classList.remove('visible');
+                    fill.style.width = '0%';
+                }, 1000);
+
+                showToast('文件上传成功！', 'success');
+                refreshFileList();
+            } catch (error) {
+                progress.classList.remove('visible');
+                showToast('上传失败: ' + error.message, 'error');
+            }
+
+            e.target.value = '';
+        });
+
+        document.getElementById('simplifyBtn').addEventListener('click', async function() {
+            const sourcePath = document.getElementById('sourceSelect').value;
+            const targetPoints = document.getElementById('targetPoints').value;
+
+            if (!sourcePath) {
+                showToast('请选择源文件', 'error');
+                return;
+            }
+
+            if (!targetPoints || targetPoints < 100) {
+                showToast('请输入有效的目标点数 (≥100)', 'error');
+                return;
+            }
+
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span><span class="loading"></span> 处理中...</span>';
+
+            const progress = document.getElementById('simplifyProgress');
+            const fill = document.getElementById('simplifyFill');
+            const text = document.getElementById('simplifyText');
+            progress.classList.add('visible');
+            fill.style.width = '50%';
+            text.textContent = '正在进行体素网格下采样...';
+
+            try {
+                const response = await fetch('/api/simplify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inputPath: sourcePath,
+                        targetPoints: parseInt(targetPoints)
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || '处理失败');
+                }
+
+                fill.style.width = '100%';
+                text.textContent = '处理完成！';
+
+                setTimeout(() => {
+                    progress.classList.remove('visible');
+                    fill.style.width = '0%';
+                }, 1500);
+
+                showToast(`简化完成! 输出: ${result.outputName}`, 'success');
+                refreshFileList();
+            } catch (error) {
+                progress.classList.remove('visible');
+                showToast('简化失败: ' + error.message, 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', refreshFileList);
+
+        document.getElementById('resetView').addEventListener('click', function() {
+            if (pointCloud) {
+                const bbox = new THREE.Box3().setFromObject(pointCloud);
+                const center = bbox.getCenter(new THREE.Vector3());
+                const size = bbox.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                
+                camera.position.set(center.x, center.y + maxDim * 0.5, center.z + maxDim * 2);
+                camera.lookAt(center);
+                controls.target.copy(center);
+                controls.update();
+            }
+        });
+
+        document.getElementById('togglePoints').addEventListener('click', function() {
+            if (pointCloud) {
+                pointCloud.visible = !pointCloud.visible;
+            }
+        });
+
+        refreshFileList();
+    </script>
+</body>
+</html>
+
