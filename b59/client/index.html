@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D 地质体素编辑器</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      background-color: #1a1a2e;
+    }
+    #container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 20px;
+      border-radius: 10px;
+      color: white;
+      z-index: 100;
+    }
+    #controls h2 {
+      margin-bottom: 15px;
+      font-size: 18px;
+      color: #4ecdc4;
+    }
+    .control-group {
+      margin-bottom: 15px;
+    }
+    .control-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+    button {
+      background: #4ecdc4;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #45b7aa;
+    }
+    button.selected {
+      background: #ff6b6b;
+    }
+    select, input {
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+      width: 100%;
+      margin-top: 5px;
+    }
+    #info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      color: white;
+      font-size: 12px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+  <div id="controls">
+    <h2>3D 地质体素编辑器</h2>
+    <div class="control-group">
+      <label>操作模式:</label>
+      <button id="btn-dig" class="selected">挖掘 (左键)</button>
+      <button id="btn-fill">填充 (左键)</button>
+    </div>
+    <div class="control-group">
+      <label>填充类型:</label>
+      <select id="voxel-type">
+        <option value="1">土壤</option>
+        <option value="2">金矿</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <label>画笔大小:</label>
+      <input type="range" id="brush-size" min="1" max="5" value="1">
+      <span id="brush-size-label">1</span>
+    </div>
+    <div class="control-group">
+      <label>文件操作:</label>
+      <button id="btn-save">保存</button>
+      <button id="btn-load">加载</button>
+    </div>
+    <div class="control-group">
+      <label>已保存文件:</label>
+      <select id="file-list"></select>
+    </div>
+    <div class="control-group">
+      <label>切片查看:</label>
+      <button id="btn-toggle-slice">开启切片</button>
+    </div>
+    <div id="slice-controls" class="control-group" style="display: none;">
+      <label>切片轴:</label>
+      <select id="slice-axis">
+        <option value="x">X 轴</option>
+        <option value="y" selected>Y 轴</option>
+        <option value="z">Z 轴</option>
+      </select>
+    </div>
+    <div id="slice-position-controls" class="control-group" style="display: none;">
+      <label>切片位置: <span id="slice-position-label">50</span></label>
+      <input type="range" id="slice-position" min="0" max="100" value="50">
+    </div>
+    <div id="slice-export-controls" class="control-group" style="display: none;">
+      <label>导出切片:</label>
+      <button id="btn-export-slice">导出 2D 图片</button>
+    </div>
+  </div>
+  <div id="info">
+    <p>鼠标左键: 挖掘/填充</p>
+    <p>鼠标右键拖动: 旋转视角</p>
+    <p>鼠标滚轮: 缩放</p>
+    <p>Shift + 鼠标右键拖动: 平移</p>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="voxel_engine.js"></script>
+  <script src="marching_cubes.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
