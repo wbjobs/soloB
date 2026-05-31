@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCF 设备互操作性测试工具</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>OCF 设备互操作性测试工具</h1>
+    </header>
+
+    <div class="main-content">
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <h2>设备发现</h2>
+          <button id="discoverBtn" class="btn btn-primary">发现设备</button>
+          <div id="deviceList" class="device-list"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <h2>测试历史</h2>
+          <button id="refreshHistoryBtn" class="btn btn-secondary">刷新历史</button>
+          <div id="testHistory" class="history-list"></div>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div id="welcomeView" class="view">
+          <div class="welcome-content">
+            <h2>欢迎使用 OCF 互操作性测试工具</h2>
+            <p>请从左侧选择设备开始测试，或查看历史测试记录</p>
+          </div>
+        </div>
+
+        <div id="testProgressView" class="view hidden">
+          <h2>测试进行中</h2>
+          <div class="progress-container">
+            <div class="progress-bar">
+              <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <p id="progressText">正在准备测试...</p>
+          </div>
+        </div>
+
+        <div id="testResultView" class="view hidden">
+          <div class="result-header">
+            <h2>测试结果</h2>
+            <button id="exportPDFBtn" class="btn btn-success">导出PDF报告</button>
+          </div>
+          <div id="testSummary" class="test-summary"></div>
+          <div id="testResults" class="test-results"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div id="detailModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalTitle">测试详情</h3>
+        <button id="closeModal" class="close-btn">&times;</button>
+      </div>
+      <div id="modalBody" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

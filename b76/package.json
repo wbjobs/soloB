@@ -1,0 +1,34 @@
+{
+  "name": "ocf-interop-tester",
+  "version": "1.0.0",
+  "description": "OCF设备互操作性测试工具",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder"
+  },
+  "keywords": ["ocf", "iotivity", "interop", "test"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^25.9.8",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.6",
+    "coap": "^1.3.0",
+    "multicast-dns": "^7.2.5",
+    "pdfkit": "^0.13.0"
+  },
+  "build": {
+    "appId": "com.ocf.interoptester",
+    "productName": "OCF互操作性测试工具",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
