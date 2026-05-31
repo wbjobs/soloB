@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测井数据处理与岩相识别系统</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .control-group label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 600;
+        }
+        select, button, input[type="number"] {
+            padding: 12px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        select:hover, input[type="number"]:hover {
+            border-color: #4a90d9;
+        }
+        select:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #4a90d9;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+            color: white;
+            font-weight: bold;
+            border: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(74, 144, 217, 0.4);
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            font-weight: bold;
+            border: none;
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: white;
+            font-weight: bold;
+            border: none;
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            color: white;
+            font-weight: bold;
+            border: none;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .btn-small {
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4a90d9;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .plot-container {
+            height: 550px;
+        }
+        .formations-card {
+            grid-column: 1 / -1;
+        }
+        .lithology-card {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+        .formation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .formation-table th, .formation-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .formation-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #333;
+        }
+        .formation-row:hover {
+            background: #f0f7ff;
+        }
+        .formation-row.selected {
+            background: #e3f2fd;
+        }
+        .lithology-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        .correlation-section {
+            grid-column: 1 / -1;
+        }
+        .well-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .well-badge {
+            background: #e9ecef;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #4a90d9;
+        }
+        .loading.active {
+            display: block;
+        }
+        .slider-control {
+            flex: 1;
+            min-width: 200px;
+        }
+        .slider-control input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        .slider-value {
+            display: inline-block;
+            background: #4a90d9;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .adjust-panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 15px;
+            display: none;
+            border: 2px solid #e0e0e0;
+        }
+        .adjust-panel.active {
+            display: block;
+        }
+        .adjust-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .info-text {
+            font-size: 12px;
+            color: #666;
+            font-style: italic;
+        }
+        .depth-input {
+            width: 120px;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-right: 20px;
+            margin-bottom: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        .color-labels {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .label-form {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+        .label-form h4 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+        .user-labeled {
+            border-left: 4px solid #ffc107;
+        }
+        .confidence-bar {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #dc3545, #ffc107, #28a745);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛢️ 测井数据处理与岩相智能识别系统</h1>
+
+        <div class="header">
+            <div class="controls">
+                <div class="control-group">
+                    <label>选择井数据</label>
+                    <select id="wellSelect">
+                        <option value="">选择井...</option>
+                    </select>
+                </div>
+
+                <div class="control-group slider-control">
+                    <label>最小地层厚度: <span id="thicknessValue" class="slider-value">1.0m</span></label>
+                    <input type="range" id="minThickness" min="0.1" max="10" step="0.1" value="1.0">
+                </div>
+
+                <div class="control-group slider-control">
+                    <label>平滑窗口大小: <span id="smoothValue" class="slider-value">11</span></label>
+                    <input type="range" id="smoothWindow" min="3" max="31" step="2" value="11">
+                </div>
+
+                <button class="btn-primary" onclick="processWell()">🔄 处理数据</button>
+                <button class="btn-primary" onclick="classifyLithology()">🔬 岩相识别</button>
+                <button class="btn-success" onclick="addSampleWell()">➕ 添加示例井</button>
+                <button class="btn-success" onclick="correlateWells()">🔗 多井对比</button>
+                <button class="btn-success" onclick="exportWitsml()">📥 导出WITSML</button>
+            </div>
+            <div class="well-list" id="wellList"></div>
+        </div>
+
+        <div class="loading" id="loading">正在处理数据，请稍候...</div>
+
+        <div class="grid" id="results" style="display: none;">
+            <div class="card">
+                <h3>📡 自然伽马 (GR)</h3>
+                <div id="grPlot" class="plot-container"></div>
+            </div>
+
+            <div class="card">
+                <h3>⚡ 电阻率 (RT)</h3>
+                <div id="rtPlot" class="plot-container"></div>
+            </div>
+
+            <div class="card">
+                <h3>🔊 声波时差 (DT)</h3>
+                <div id="dtPlot" class="plot-container"></div>
+            </div>
+
+            <div class="card lithology-card">
+                <div>
+                    <h3>🪨 岩相柱状图</h3>
+                    <div id="lithologyPlot" class="plot-container"></div>
+                </div>
+                <div>
+                    <h3>📊 岩相概率分布</h3>
+                    <div id="probabilityPlot" class="plot-container"></div>
+                    <div class="color-labels">
+                        <h4 style="margin-bottom: 10px;">岩相图例</h4>
+                        <div id="lithologyLegend"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card formations-card">
+                <h3>🏔️ 地层划分结果 <span class="info-text">(点击行进行手动调整)</span></h3>
+                <div class="stats-grid" id="snrStats"></div>
+
+                <div class="adjust-panel" id="adjustPanel">
+                    <h4 style="margin-bottom: 15px; color: #4a90d9;">✏️ 地层手动调整</h4>
+                    <div class="adjust-row">
+                        <div class="control-group">
+                            <label>选中地层</label>
+                            <input type="text" id="selectedFormation" readonly style="background: #f0f0f0; width: 200px;">
+                        </div>
+                        <div class="control-group">
+                            <label>新顶深 (m)</label>
+                            <input type="number" id="newTopDepth" step="0.1" class="depth-input">
+                        </div>
+                        <div class="control-group">
+                            <label>新底深 (m)</label>
+                            <input type="number" id="newBottomDepth" step="0.1" class="depth-input">
+                        </div>
+                    </div>
+                    <div class="adjust-row">
+                        <div class="action-buttons">
+                            <button class="btn-primary" onclick="applyAdjustment()">应用调整</button>
+                            <button class="btn-warning" onclick="mergeFormation()">与下层合并</button>
+                            <button class="btn-danger" onclick="cancelAdjustment()">取消</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="label-form" id="labelForm">
+                    <h4>🏷️ 岩相标注 (用于模型增量训练)</h4>
+                    <div class="adjust-row">
+                        <div class="control-group">
+                            <label>顶深 (m)</label>
+                            <input type="number" id="labelTopDepth" step="0.1" class="depth-input">
+                        </div>
+                        <div class="control-group">
+                            <label>底深 (m)</label>
+                            <input type="number" id="labelBottomDepth" step="0.1" class="depth-input">
+                        </div>
+                        <div class="control-group">
+                            <label>岩相类型</label>
+                            <select id="lithologyType"></select>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn-warning" onclick="addLithologyLabel()">添加标注</button>
+                            <button class="btn-success" onclick="retrainModel()">🔄 增量训练</button>
+                        </div>
+                    </div>
+                </div>
+
+                <table class="formation-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>地层名称</th>
+                            <th>顶深 (m)</th>
+                            <th>底深 (m)</th>
+                            <th>厚度 (m)</th>
+                            <th>岩相</th>
+                            <th>置信度</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="formationTable"></tbody>
+                </table>
+            </div>
+
+            <div class="card correlation-section" id="correlationSection" style="display: none;">
+                <h3>🔗 多井地层对比</h3>
+                <div id="correlationPlot" class="plot-container"></div>
+                <div id="correlationInfo"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentData = null;
+        let currentLithologyData = null;
+        let selectedFormationIndex = -1;
+        let userLabels = [];
+
+        const LITHOLOGY_COLORS = {
+            'Sandstone': '#e67e22',
+            'Shale': '#7f8c8d',
+            'Limestone': '#3498db',
+            'Dolomite': '#9b59b6',
+            'Coal': '#2c3e50',
+            'Siltstone': '#d35400'
+        };
+
+        const LITHOLOGY_NAMES_CN = {
+            'Sandstone': '砂岩',
+            'Shale': '页岩',
+            'Limestone': '石灰岩',
+            'Dolomite': '白云岩',
+            'Coal': '煤岩',
+            'Siltstone': '粉砂岩'
+        };
+
+        async function loadWells() {
+            try {
+                const response = await fetch(`${API_BASE}/wells`);
+                const wells = await response.json();
+
+                const select = document.getElementById('wellSelect');
+                select.innerHTML = '<option value="">选择井...</option>';
+                wells.forEach(well => {
+                    const option = document.createElement('option');
+                    option.value = well.well_id;
+                    option.textContent = `${well.well_name} (${well.start_depth.toFixed(0)}m - ${well.stop_depth.toFixed(0)}m)`;
+                    select.appendChild(option);
+                });
+
+                const wellList = document.getElementById('wellList');
+                wellList.innerHTML = wells.map(w => `<span class="well-badge">${w.well_name}</span>`).join('');
+            } catch (error) {
+                console.error('加载井数据失败:', error);
+            }
+        }
+
+        async function loadLithologyTypes() {
+            try {
+                const response = await fetch(`${API_BASE}/lithology/types`);
+                const types = await response.json();
+                const select = document.getElementById('lithologyType');
+                select.innerHTML = types.map(t => 
+                    `<option value="${t}">${LITHOLOGY_NAMES_CN[t] || t}</option>`
+                ).join('');
+                
+                const legend = document.getElementById('lithologyLegend');
+                legend.innerHTML = types.map(t => `
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: ${LITHOLOGY_COLORS[t] || '#808080'}"></div>
+                        <span>${LITHOLOGY_NAMES_CN[t] || t}</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('加载岩相类型失败:', error);
+            }
+        }
+
+        async function addSampleWell() {
+            try {
+                await fetch(`${API_BASE}/wells/sample`, { method: 'POST' });
+                loadWells();
+            } catch (error) {
+                console.error('添加示例井失败:', error);
+            }
+        }
+
+        async function processWell() {
+            const wellId = document.getElementById('wellSelect').value;
+            if (!wellId) {
+                alert('请先选择一口井');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const minThickness = parseFloat(document.getElementById('minThickness').value);
+                const smoothWindow = parseInt(document.getElementById('smoothWindow').value);
+
+                const response = await fetch(`${API_BASE}/process`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        well_id: wellId,
+                        min_thickness: minThickness,
+                        smooth_window: smoothWindow
+                    })
+                });
+                const data = await response.json();
+                currentData = data;
+                selectedFormationIndex = -1;
+
+                plotLogData(data);
+                displayFormations(data);
+                displaySNRStats(data);
+
+                document.getElementById('results').style.display = 'grid';
+                document.getElementById('adjustPanel').classList.remove('active');
+            } catch (error) {
+                console.error('处理井数据失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        async function classifyLithology() {
+            const wellId = document.getElementById('wellSelect').value;
+            if (!wellId) {
+                alert('请先选择一口井');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const smoothWindow = parseInt(document.getElementById('smoothWindow').value);
+
+                const response = await fetch(`${API_BASE}/lithology/classify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        well_id: wellId,
+                        smooth_window: smoothWindow
+                    })
+                });
+                const data = await response.json();
+                currentLithologyData = data;
+
+                plotLithology(data);
+                plotProbability(data);
+                displayLithologyStats(data);
+
+                document.getElementById('results').style.display = 'grid';
+            } catch (error) {
+                console.error('岩相识别失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function plotLogData(data) {
+            const curves = ['GR', 'RT', 'DT'];
+            const yAxis = data.depth;
+
+            const shapes = data.formations.formations.map(f => ({
+                type: 'rect',
+                xref: 'paper',
+                yref: 'y',
+                x0: 0,
+                x1: 1,
+                y0: f.top_depth,
+                y1: f.bottom_depth,
+                fillcolor: 'rgba(74, 144, 217, 0.05)',
+                line: {
+                    color: 'rgba(74, 144, 217, 0.5)',
+                    width: 1,
+                    dash: 'dash'
+                },
+                layer: 'below'
+            }));
+
+            curves.forEach(curve => {
+                const traces = [
+                    {
+                        x: data.smoothed_curves[curve],
+                        y: yAxis,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: '平滑后',
+                        line: { color: '#e74c3c', width: 2 }
+                    },
+                    {
+                        x: data.denoised_curves[curve],
+                        y: yAxis,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: '去噪后',
+                        line: { color: '#3498db', width: 1, dash: 'dot', opacity: 0.6 }
+                    }
+                ];
+
+                const layout = {
+                    yaxis: {
+                        title: '深度 (m)',
+                        autorange: 'reversed',
+                        showgrid: true
+                    },
+                    xaxis: { title: curve },
+                    margin: { l: 60, r: 20, t: 30, b: 40 },
+                    showlegend: true,
+                    legend: { orientation: 'h', x: 0, y: 1.1 },
+                    shapes: shapes
+                };
+
+                Plotly.newPlot(`${curve.toLowerCase()}Plot`, traces, layout);
+            });
+        }
+
+        function plotLithology(data) {
+            const yAxis = data.predictions.map(p => p.depth);
+            const colors = data.predictions.map(p => LITHOLOGY_COLORS[p.lithology] || '#808080');
+
+            const trace = {
+                x: data.predictions.map((_, i) => 1),
+                y: yAxis,
+                type: 'bar',
+                orientation: 'h',
+                marker: {
+                    color: colors,
+                    line: { width: 0 }
+                },
+                width: 1,
+                hovertemplate:
+                    '<b>深度: %{y:.1f}m</b><br>' +
+                    '岩相: %{text}<br>' +
+                    '<extra></extra>',
+                text: data.predictions.map(p => LITHOLOGY_NAMES_CN[p.lithology] || p.lithology)
+            };
+
+            const layout = {
+                yaxis: {
+                    title: '深度 (m)',
+                    autorange: 'reversed',
+                    showgrid: true
+                },
+                xaxis: {
+                    showticklabels: false,
+                    showgrid: false
+                },
+                margin: { l: 60, r: 20, t: 30, b: 40 },
+                showlegend: false,
+                bargap: 0
+            };
+
+            Plotly.newPlot('lithologyPlot', [trace], layout);
+        }
+
+        function plotProbability(data) {
+            const yAxis = data.predictions.map(p => p.depth);
+            const lithologyTypes = data.lithology_types;
+
+            const traces = lithologyTypes.map((litho, i) => ({
+                x: data.predictions.map(p => p.probabilities[i]),
+                y: yAxis,
+                type: 'scatter',
+                mode: 'lines',
+                name: LITHOLOGY_NAMES_CN[litho] || litho,
+                line: { color: LITHOLOGY_COLORS[litho], width: 2 },
+                fill: 'tonexty'
+            }));
+
+            const layout = {
+                yaxis: {
+                    title: '深度 (m)',
+                    autorange: 'reversed',
+                    showgrid: true
+                },
+                xaxis: {
+                    title: '概率',
+                    range: [0, 1]
+                },
+                margin: { l: 60, r: 20, t: 30, b: 40 },
+                showlegend: true,
+                legend: { orientation: 'h', x: 0, y: 1.1 }
+            };
+
+            Plotly.newPlot('probabilityPlot', traces, layout);
+        }
+
+        function displaySNRStats(data) {
+            const statsDiv = document.getElementById('snrStats');
+            const mergedInfo = data.formations.num_merged > 0
+                ? `<div class="stat-card" style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);">
+                    <div class="stat-value">${data.formations.num_merged}</div>
+                    <div class="stat-label">合并薄层数</div>
+                   </div>`
+                : '';
+
+            statsDiv.innerHTML = Object.entries(data.snr_improvements).map(([curve, snr]) => `
+                <div class="stat-card">
+                    <div class="stat-value">${snr.toFixed(2)} dB</div>
+                    <div class="stat-label">${curve} 信噪比提升</div>
+                </div>
+            `).join('') + mergedInfo;
+        }
+
+        function displayLithologyStats(data) {
+            const lithologyCounts = {};
+            data.predictions.forEach(p => {
+                lithologyCounts[p.lithology] = (lithologyCounts[p.lithology] || 0) + 1;
+            });
+
+            const avgConfidence = data.predictions.reduce((sum, p) => sum + p.confidence, 0) / data.predictions.length;
+
+            const statsDiv = document.getElementById('snrStats');
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${(avgConfidence * 100).toFixed(1)}%</div>
+                    <div class="stat-label">平均置信度</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.predictions.length}</div>
+                    <div class="stat-label">总样本数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.model_info.n_trees}</div>
+                    <div class="stat-label">决策树数量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${userLabels.length}</div>
+                    <div class="stat-label">用户标注数</div>
+                </div>
+            `;
+        }
+
+        function displayFormations(data) {
+            const tbody = document.getElementById('formationTable');
+
+            tbody.innerHTML = data.formations.formations.map((f, idx) => {
+                const color = LITHOLOGY_COLORS[f.lithology] || '#808080';
+                const isUserLabeled = userLabels.some(l => l.top <= f.top_depth && l.bottom >= f.bottom_depth);
+                return `
+                    <tr class="formation-row ${isUserLabeled ? 'user-labeled' : ''}" onclick="selectFormation(${idx})" style="cursor: pointer;">
+                        <td><strong>${idx + 1}</strong></td>
+                        <td><strong>${f.name}</strong></td>
+                        <td>${f.top_depth.toFixed(2)}</td>
+                        <td>${f.bottom_depth.toFixed(2)}</td>
+                        <td>${f.thickness.toFixed(2)}</td>
+                        <td><span class="lithology-badge" style="background: ${color}">${LITHOLOGY_NAMES_CN[f.lithology] || f.lithology}</span></td>
+                        <td>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${(f.confidence || 0.7) * 100}%"></div>
+                            </div>
+                        </td>
+                        <td><button class="btn-danger" onclick="event.stopPropagation(); selectFormation(${idx}); fillLabelForm(${idx})">编辑</button></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function fillLabelForm(idx) {
+            const f = currentData.formations.formations[idx];
+            document.getElementById('labelTopDepth').value = f.top_depth.toFixed(2);
+            document.getElementById('labelBottomDepth').value = f.bottom_depth.toFixed(2);
+        }
+
+        function selectFormation(index) {
+            selectedFormationIndex = index;
+            const f = currentData.formations.formations[index];
+
+            document.getElementById('selectedFormation').value = f.name;
+            document.getElementById('newTopDepth').value = f.top_depth.toFixed(2);
+            document.getElementById('newBottomDepth').value = f.bottom_depth.toFixed(2);
+
+            document.getElementById('adjustPanel').classList.add('active');
+            displayFormations(currentData);
+        }
+
+        function cancelAdjustment() {
+            selectedFormationIndex = -1;
+            document.getElementById('adjustPanel').classList.remove('active');
+            displayFormations(currentData);
+        }
+
+        async function applyAdjustment() {
+            if (selectedFormationIndex < 0) {
+                alert('请先选择一个地层');
+                return;
+            }
+
+            const wellId = document.getElementById('wellSelect').value;
+            const newTop = parseFloat(document.getElementById('newTopDepth').value);
+            const newBottom = parseFloat(document.getElementById('newBottomDepth').value);
+
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/adjust`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        well_id: wellId,
+                        formation_index: selectedFormationIndex,
+                        new_top_depth: newTop,
+                        new_bottom_depth: newBottom
+                    })
+                });
+                const data = await response.json();
+                currentData = data;
+
+                plotLogData(data);
+                displayFormations(data);
+                displaySNRStats(data);
+
+                document.getElementById('adjustPanel').classList.remove('active');
+                selectedFormationIndex = -1;
+            } catch (error) {
+                console.error('应用调整失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        async function mergeFormation() {
+            if (selectedFormationIndex < 0) {
+                alert('请先选择一个地层');
+                return;
+            }
+
+            if (selectedFormationIndex >= currentData.formations.formations.length - 1) {
+                alert('无法合并最后一个地层');
+                return;
+            }
+
+            const wellId = document.getElementById('wellSelect').value;
+
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/adjust`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        well_id: wellId,
+                        formation_index: selectedFormationIndex,
+                        merge_with_next: true
+                    })
+                });
+                const data = await response.json();
+                currentData = data;
+
+                plotLogData(data);
+                displayFormations(data);
+                displaySNRStats(data);
+
+                document.getElementById('adjustPanel').classList.remove('active');
+                selectedFormationIndex = -1;
+            } catch (error) {
+                console.error('合并地层失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        async function addLithologyLabel() {
+            const wellId = document.getElementById('wellSelect').value;
+            if (!wellId) {
+                alert('请先选择一口井');
+                return;
+            }
+
+            const topDepth = parseFloat(document.getElementById('labelTopDepth').value);
+            const bottomDepth = parseFloat(document.getElementById('labelBottomDepth').value);
+            const lithology = document.getElementById('lithologyType').value;
+
+            if (!topDepth || !bottomDepth) {
+                alert('请输入有效的深度值');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/lithology/label`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        well_id: wellId,
+                        top_depth: topDepth,
+                        bottom_depth: bottomDepth,
+                        lithology: lithology
+                    })
+                });
+                const result = await response.json();
+                alert(result);
+
+                userLabels.push({ top: topDepth, bottom: bottomDepth, lithology });
+
+                if (currentData) {
+                    displayFormations(currentData);
+                }
+            } catch (error) {
+                console.error('添加岩相标注失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        async function retrainModel() {
+            const wellId = document.getElementById('wellSelect').value;
+            if (!wellId) {
+                alert('请先选择一口井');
+                return;
+            }
+
+            if (userLabels.length === 0) {
+                alert('请先添加至少一个岩相标注');
+                return;
+            }
+
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/lithology/retrain`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ well_id: wellId })
+                });
+                const result = await response.json();
+                alert(result);
+
+                await classifyLithology();
+            } catch (error) {
+                console.error('模型增量训练失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        async function correlateWells() {
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_BASE}/correlate`);
+                const data = await response.json();
+
+                displayCorrelation(data);
+                document.getElementById('correlationSection').style.display = 'block';
+            } catch (error) {
+                console.error('多井对比失败:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+
+        function displayCorrelation(data) {
+            const corr = data.correlation;
+            const traces = [];
+
+            corr.correlated_formations.forEach((zone, idx) => {
+                const wells = Object.entries(zone.wells);
+                const x = wells.map(w => w[0]);
+                const yTop = wells.map(w => w[1][0]);
+                const yBottom = wells.map(w => w[1][1]);
+
+                traces.push({
+                    x: x,
+                    y: yTop,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: `${zone.name} 顶`,
+                    line: { color: `hsl(${idx * 60}, 70%, 50%)`, width: 3 },
+                    marker: { size: 10 }
+                });
+
+                traces.push({
+                    x: x,
+                    y: yBottom,
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: `${zone.name} 底`,
+                    line: { color: `hsl(${idx * 60}, 70%, 30%)`, width: 3 },
+                    marker: { size: 10 },
+                    fill: 'tonexty',
+                    fillcolor: `hsla(${idx * 60}, 70%, 50%, 0.2)`
+                });
+            });
+
+            const layout = {
+                title: '多井地层对比图',
+                yaxis: {
+                    title: '深度 (m)',
+                    autorange: 'reversed'
+                },
+                margin: { l: 60, r: 20, t: 50, b: 40 },
+                showlegend: true,
+                legend: { orientation: 'h', x: 0, y: 1.1 }
+            };
+
+            Plotly.newPlot('correlationPlot', traces, layout);
+
+            document.getElementById('correlationInfo').innerHTML = `
+                <h4>关联地层信息:</h4>
+                <ul style="list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                    ${corr.correlated_formations.map(z => `
+                        <li style="background: #f8f9fa; padding: 10px 15px; border-radius: 8px; border-left: 4px solid #4a90d9;">
+                            <strong>${z.name}</strong> (${LITHOLOGY_NAMES_CN[z.lithology] || z.lithology})<br>
+                            <small>关联置信度: ${(z.correlation_score * 100).toFixed(1)}%</small>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        }
+
+        async function exportWitsml() {
+            const wellId = document.getElementById('wellSelect').value;
+            if (!wellId) {
+                alert('请先选择一口井');
+                return;
+            }
+
+            const minThickness = parseFloat(document.getElementById('minThickness').value);
+            const smoothWindow = parseInt(document.getElementById('smoothWindow').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/export/witsml`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        well_id: wellId,
+                        min_thickness: minThickness,
+                        smooth_window: smoothWindow
+                    })
+                });
+                const xml = await response.text();
+
+                const blob = new Blob([xml], { type: 'application/xml' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${wellId}_witsml.xml`;
+                a.click();
+            } catch (error) {
+                console.error('导出WITSML失败:', error);
+            }
+        }
+
+        document.getElementById('minThickness').addEventListener('input', function(e) {
+            document.getElementById('thicknessValue').textContent = e.target.value + 'm';
+        });
+
+        document.getElementById('smoothWindow').addEventListener('input', function(e) {
+            document.getElementById('smoothValue').textContent = e.target.value;
+        });
+
+        loadWells();
+        loadLithologyTypes();
+    </script>
+</body>
+</html>

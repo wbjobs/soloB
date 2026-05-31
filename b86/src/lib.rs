@@ -1,0 +1,22 @@
+pub mod error;
+pub mod las;
+pub mod wavelet;
+pub mod pelt;
+pub mod lithology;
+pub mod correlation;
+pub mod witsml;
+pub mod api;
+pub mod smooth;
+pub mod random_forest;
+pub mod lithology_classifier;
+
+pub use error::{Result, WellLogError};
+pub use las::{LasData, LasCurve};
+pub use wavelet::{wavelet_denoise, calculate_snr};
+pub use pelt::{detect_changepoints, Formations, merge_thin_layers};
+pub use lithology::LithologyPrediction;
+pub use correlation::{WellCorrelation, correlate_wells};
+pub use witsml::export_to_witsml;
+pub use smooth::{savgol_filter, exponential_smoothing, moving_average};
+pub use random_forest::{RandomForest, get_lithology_color};
+pub use lithology_classifier::{LithologyClassifier, ClassificationResult, get_lithology_types};
