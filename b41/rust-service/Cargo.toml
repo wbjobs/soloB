@@ -1,0 +1,21 @@
+[package]
+name = "alignment-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tonic = { version = "0.10", optional = true }
+prost = { version = "0.12", optional = true }
+tokio = { version = "1.35", features = ["full"], optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[build-dependencies]
+tonic-build = "0.10"
+
+[lib]
+crate-type = ["cdylib", "lib", "rlib"]
+
+[features]
+default = ["server"]
+server = ["dep:tonic", "dep:prost", "dep:tokio"]

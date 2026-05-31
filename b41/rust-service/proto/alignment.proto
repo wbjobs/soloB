@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package alignment;
+
+service AlignmentService {
+  rpc Align(AlignRequest) returns (AlignResponse);
+}
+
+message AlignRequest {
+  string sequence_a = 1;
+  string sequence_b = 2;
+  int32 match_score = 3;
+  int32 mismatch_score = 4;
+  int32 gap_score = 5;
+}
+
+message AlignResponse {
+  string aligned_a = 1;
+  string aligned_b = 2;
+  string alignment_string = 3;
+  int32 score = 4;
+  repeated ProgressUpdate progress = 5;
+}
+
+message ProgressUpdate {
+  int32 step = 1;
+  int32 total = 2;
+  string message = 3;
+}
