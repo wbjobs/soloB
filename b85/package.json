@@ -1,0 +1,41 @@
+{
+  "name": "p2p-file-distributor",
+  "version": "1.0.0",
+  "description": "P2P文件分发CLI工具，支持Tracker+DHT混合寻址，内网优化",
+  "main": "dist/index.js",
+  "bin": {
+    "p2pfd": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/cli.ts",
+    "start": "node dist/cli.js"
+  },
+  "keywords": [
+    "p2p",
+    "file-distribution",
+    "bittorrent",
+    "内网传输"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0",
+    "commander": "^11.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "netmask": "^2.0.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.5",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/netmask": "^2.0.2",
+    "@types/node": "^20.10.0",
+    "@types/uuid": "^9.0.7",
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.2"
+  }
+}
