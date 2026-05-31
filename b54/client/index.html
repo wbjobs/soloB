@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CFD Flow Simulation - 3D Visualization</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 100%);
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(100, 150, 255, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 500;
+            background: linear-gradient(90deg, #4aa3ff, #9966ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.connected {
+            background: #44ff44;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-container {
+            display: flex;
+            height: 100vh;
+            padding-top: 60px;
+        }
+        
+        #canvas-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        .sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(10px);
+            border-left: 1px solid rgba(100, 150, 255, 0.2);
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #4aa3ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stats-panel {
+            background: rgba(50, 80, 150, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(100, 150, 255, 0.2);
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .stat-label {
+            color: #aaa;
+        }
+        
+        .stat-value {
+            color: #4aa3ff;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .controls-panel {
+            background: rgba(50, 80, 150, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid rgba(100, 150, 255, 0.2);
+        }
+        
+        .control-btn {
+            width: 100%;
+            padding: 12px 20px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #4a7fbf 0%, #3a5f9f 100%);
+            color: white;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(74, 127, 191, 0.4);
+        }
+        
+        .control-btn:active {
+            transform: translateY(0);
+        }
+        
+        .control-btn.reset {
+            background: linear-gradient(135deg, #bf4a4a 0%, #9f3a3a 100%);
+        }
+        
+        .control-btn.reset:hover {
+            box-shadow: 0 5px 20px rgba(191, 74, 74, 0.4);
+        }
+        
+        .mode-buttons {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: 2px solid rgba(100, 150, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(50, 80, 150, 0.2);
+            color: #aaa;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .mode-btn:hover {
+            border-color: rgba(100, 150, 255, 0.6);
+            color: #fff;
+        }
+        
+        .mode-btn.active {
+            background: linear-gradient(135deg, #4a7fbf 0%, #3a5f9f 100%);
+            border-color: transparent;
+            color: white;
+            box-shadow: 0 4px 15px rgba(74, 127, 191, 0.3);
+        }
+        
+        .info-section {
+            background: rgba(50, 80, 150, 0.2);
+            border-radius: 10px;
+            padding: 12px 15px;
+            margin-top: 15px;
+            border: 1px solid rgba(100, 150, 255, 0.2);
+            font-size: 12px;
+            color: #aaa;
+            line-height: 1.5;
+        }
+        
+        .info-section strong {
+            color: #4aa3ff;
+        }
+        
+        .info-panel {
+            background: rgba(50, 80, 150, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            border: 1px solid rgba(100, 150, 255, 0.2);
+            font-size: 12px;
+            color: #888;
+            line-height: 1.6;
+        }
+        
+        .legend {
+            background: rgba(50, 80, 150, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(100, 150, 255, 0.2);
+        }
+        
+        .legend-title {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 10px;
+        }
+        
+        .legend-bar {
+            height: 20px;
+            border-radius: 5px;
+            background: linear-gradient(90deg, 
+                #3366ff 0%, 
+                #33aaff 25%, 
+                #66ff99 50%, 
+                #ffff66 75%, 
+                #ff6633 100%
+            );
+            margin-bottom: 5px;
+        }
+        
+        .legend-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #888;
+            backdrop-filter: blur(5px);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔬 CFD Flow Simulation - 3D Visualization</h1>
+        <div class="connection-status">
+            <div class="status-indicator" id="status-light"></div>
+            <span id="connection-status">Connecting...</span>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div id="canvas-container">
+            <div class="overlay">
+                🖱️ Drag to rotate | Scroll to zoom | Right-click to pan
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="sidebar-title">Simulation</div>
+            
+            <div class="stats-panel">
+                <div class="stat-item">
+                    <span class="stat-label">Time Step:</span>
+                    <span class="stat-value" id="step-count">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max Velocity:</span>
+                    <span class="stat-value" id="max-velocity">0.000</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Grid Size:</span>
+                    <span class="stat-value">32×32×32</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Viscosity (ν):</span>
+                    <span class="stat-value">0.05</span>
+                </div>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-title">Velocity Magnitude</div>
+                <div class="legend-bar"></div>
+                <div class="legend-labels">
+                    <span>0.0</span>
+                    <span>2.0</span>
+                </div>
+            </div>
+            
+            <div class="controls-panel">
+                <div class="sidebar-title" style="margin-bottom: 15px;">View Mode</div>
+                <div class="mode-buttons">
+                    <button class="mode-btn active" id="btn-particles" onclick="setViewMode('particles')">
+                        • Particles
+                    </button>
+                    <button class="mode-btn" id="btn-streamlines" onclick="setViewMode('streamlines')">
+                        ⟶ Streamlines
+                    </button>
+                </div>
+                
+                <div class="info-section" id="mode-info">
+                    <strong>Particle Mode:</strong><br>
+                    3000 tracer particles advected by the velocity field. Updated continuously in real-time.
+                </div>
+            </div>
+            
+            <div class="controls-panel">
+                <div class="sidebar-title" style="margin-bottom: 15px;">Controls</div>
+                <button class="control-btn reset" onclick="renderer.resetSimulation()">
+                    🔄 Reset Simulation
+                </button>
+            </div>
+            
+            <div class="info-panel">
+                <strong>Physical Model:</strong><br>
+                3D Navier-Stokes Equations<br>
+                Finite Difference Method<br><br>
+                <strong>Features:</strong><br>
+                • Poiseuille flow profile<br>
+                • Pressure field solver<br>
+                • Velocity projection<br>
+                • No-slip boundaries
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="renderer.js"></script>
+    
+    <script>
+        let renderer;
+        
+        function updateStatusIndicator(status) {
+            const light = document.getElementById('status-light');
+            if (status === 'green') {
+                light.classList.add('connected');
+            } else {
+                light.classList.remove('connected');
+            }
+        }
+        
+        const originalUpdateStatus = FluidRenderer.prototype.updateStatus;
+        FluidRenderer.prototype.updateStatus = function(text, color) {
+            originalUpdateStatus.call(this, text, color);
+            updateStatusIndicator(color);
+        };
+        
+        window.addEventListener('DOMContentLoaded', () => {
+            renderer = new FluidRenderer('canvas-container');
+        });
+        
+        function setViewMode(mode) {
+            if (!renderer) return;
+            
+            const btnParticles = document.getElementById('btn-particles');
+            const btnStreamlines = document.getElementById('btn-streamlines');
+            const modeInfo = document.getElementById('mode-info');
+            
+            if (mode === 'particles') {
+                btnParticles.classList.add('active');
+                btnStreamlines.classList.remove('active');
+                modeInfo.innerHTML = '<strong>Particle Mode:</strong><br>3000 tracer particles advected by the velocity field. Updated continuously in real-time.';
+            } else {
+                btnParticles.classList.remove('active');
+                btnStreamlines.classList.add('active');
+                modeInfo.innerHTML = '<strong>Streamline Mode:</strong><br>36 streamlines traced from inlet using RK4 integration. Color-coded by local flow speed.';
+            }
+            
+            renderer.setViewMode(mode);
+        }
+    </script>
+</body>
+</html>
