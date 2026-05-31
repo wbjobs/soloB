@@ -1,0 +1,17 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+celery==5.3.4
+redis==5.0.1
+numpy==1.26.2
+opencv-python==4.8.1.78
+scikit-image==0.22.0
+scipy==1.11.4
+python-multipart==0.0.6
+aiofiles==23.2.1
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+gunicorn==21.2.0
+requests==2.31.0
+matplotlib==3.8.2
+pandas==2.1.4
