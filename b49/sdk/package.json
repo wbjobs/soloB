@@ -1,0 +1,27 @@
+{
+  "name": "task-crdt-sdk",
+  "version": "0.1.0",
+  "description": "CRDT-based task management SDK with offline support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "test": "echo \"No tests available\" && exit 0"
+  },
+  "keywords": [
+    "crdt",
+    "task",
+    "offline",
+    "sync"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}
