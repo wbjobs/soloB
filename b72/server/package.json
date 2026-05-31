@@ -1,0 +1,28 @@
+{
+  "name": "score-collab-server",
+  "version": "1.0.0",
+  "description": "PDF 乐谱协同批注系统 - 后端服务",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^7.5.0",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.2",
+    "pdf-parse": "^1.1.1",
+    "canvas": "^2.11.2",
+    "jimp": "^0.22.10",
+    "pdf2pic": "^3.1.1",
+    "sharp": "^0.32.6"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
