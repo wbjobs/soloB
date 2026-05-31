@@ -1,0 +1,11 @@
+asyncio==3.4.3
+bencode.py==2.1.0
+requests==2.31.0
+lightgbm==4.3.0
+scikit-learn==1.4.0
+pandas==2.2.0
+numpy==1.26.3
+python-dotenv==1.0.0
+geoip2==4.8.0
+maxminddb==2.5.0
+aioquic==0.9.20
