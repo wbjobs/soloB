@@ -1,0 +1,54 @@
+[package]
+name = "p2p-notes"
+version = "0.1.0"
+description = "Offline-first P2P Notes Application"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+name = "p2p_notes_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = ["shell-open"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "chrono", "macros"] }
+sqlx-migrate = "0.7"
+
+# P2P
+libp2p = { version = "0.53", features = [
+    "gossipsub",
+    "mdns",
+    "tcp",
+    "noise",
+    "yamux",
+    "async-io",
+    "macros"
+] }
+futures = "0.3"
+tokio = { version = "1.35", features = ["full"] }
+tokio-stream = "0.1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+async-std = { version = "1.12", features = ["attributes"] }
+
+# Utilities
+uuid = { version = "1.6", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1.0"
+anyhow = "1.0"
+tracing-log = "0.2"
+log = "0.4"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
