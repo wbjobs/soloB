@@ -1,0 +1,30 @@
+{
+  "name": "coldchain-monitor",
+  "version": "1.0.0",
+  "description": "冷链监控数据处理服务",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn src/index.ts",
+    "generate:testdata": "ts-node scripts/generateTestData.ts",
+    "proto": "grpc_tools_node_protoc --js_out=import_style=commonjs,binary:src/generated --grpc_out=grpc_js:src/generated --plugin=protoc-gen-grpc=`which grpc_tools_node_protoc_plugin` proto/coldchain.proto",
+    "proto:ts": "protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=./src/generated --ts_proto_opt=outputServices=grpc-js,env=node,esModuleInterop=true ./proto/coldchain.proto"
+  },
+  "keywords": ["coldchain", "iot", "timescaledb", "grpc"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.9.0",
+    "pg": "^8.11.0",
+    "dotenv": "^16.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.10.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0",
+    "ts-node-dev": "^2.0.0",
+    "ts-proto": "^1.150.0"
+  }
+}
