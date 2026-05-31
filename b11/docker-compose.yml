@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6
+    container_name: code-collab-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=code_collab
+    networks:
+      - code-collab-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: code-collab-backend
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - JWT_EXPIRES_IN=24h
+      - SOCKET_ORIGIN=http://localhost:3000
+      - SANDBOX_URL=http://sandbox:3002
+      - MONGODB_URI=mongodb://mongodb:27017/code_collab
+      - OPENAI_API_KEY=your-openai-api-key-here
+      - OPENAI_MODEL=gpt-4o
+      - AUTO_SAVE_INTERVAL=300
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - sandbox
+    networks:
+      - code-collab-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: code-collab-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
+      - REACT_APP_SOCKET_URL=http://localhost:3001
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - code-collab-network
+    restart: unless-stopped
+
+  sandbox:
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    container_name: code-collab-sandbox
+    privileged: true
+    ports:
+      - "3002:3002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./sandbox:/app
+      - /app/node_modules
+    networks:
+      - code-collab-network
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+
+networks:
+  code-collab-network:
+    driver: bridge
