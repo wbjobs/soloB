@@ -1,0 +1,4 @@
+{"name": "Alice", "age": 25, "address": null, "tags": []}
+{"name": "Bob", "age": null, "address": {"city": "London"}, "tags": ["a", null, "b"]}
+{"name": "Charlie", "active": true, "score": 0}
+{"name": "Diana", "active": false, "empty": ""}

@@ -1,0 +1,2 @@
+{"name": "Alice", "age": 25, "address": {"city": "New York", "zip": "10001"}, "hobbies": ["reading", "hiking"]}
+{"name": "Bob", "age": 35, "address": {"city": "London", "zip": "SW1A 1AA"}, "hobbies": ["gaming", "coding"]}
