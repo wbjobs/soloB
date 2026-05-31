@@ -1,0 +1,22 @@
+{
+  "name": "collaborative-flowchart",
+  "version": "1.0.0",
+  "description": "Real-time collaborative flowchart drawing tool",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm --workspace server run dev",
+    "dev:client": "npm --workspace client run dev",
+    "install:all": "npm install && npm --workspace server install && npm --workspace client install",
+    "build": "npm --workspace client run build",
+    "start": "npm --workspace server start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
