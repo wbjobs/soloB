@@ -1,0 +1,19 @@
+# Rust
+/target
+Cargo.lock
+
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+pnpm-debug.log
+lerna-debug.log
+
+# SvelteKit
+.svelte-kit
+build
+.env
+.env.*
+!.env.example
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
