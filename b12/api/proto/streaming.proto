@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package streaming;
+option go_package = "api/proto;streaming";
+
+service StreamingService {
+  rpc CreateStreamPipeline(CreateStreamPipelineRequest) returns (CreateStreamPipelineResponse);
+  rpc GetStreamPipeline(GetStreamPipelineRequest) returns (GetStreamPipelineResponse);
+  rpc ListStreamPipelines(ListStreamPipelinesRequest) returns (ListStreamPipelinesResponse);
+  rpc DeleteStreamPipeline(DeleteStreamPipelineRequest) returns (DeleteStreamPipelineResponse);
+  rpc StartPipeline(StartPipelineRequest) returns (StartPipelineResponse);
+  rpc StopPipeline(StopPipelineRequest) returns (StopPipelineResponse);
+}
+
+message CreateStreamPipelineRequest {
+  string name = 1;
+  string source_topic = 2;
+  string target_topic = 3;
+  TransformSpec transform = 4;
+  WindowSpec window = 5;
+  ExactlyOnceSpec exactly_once = 6;
+}
+
+message TransformSpec {
+  string type = 1;
+  string expression = 2;
+  bytes custom_code = 3;
+}
+
+message WindowSpec {
+  string type = 1;
+  int64 size_ms = 2;
+  int64 slide_ms = 3;
+  int64 gap_ms = 4;
+}
+
+message ExactlyOnceSpec {
+  bool enabled = 1;
+  string transactional_id = 2;
+}
+
+message StreamPipeline {
+  string id = 1;
+  string name = 2;
+  string source_topic = 3;
+  string target_topic = 4;
+  TransformSpec transform = 5;
+  WindowSpec window = 6;
+  ExactlyOnceSpec exactly_once = 7;
+  string status = 8;
+  int64 created_at = 9;
+  int64 messages_processed = 10;
+}
+
+message CreateStreamPipelineResponse {
+  string pipeline_id = 1;
+  bool success = 2;
+}
+
+message GetStreamPipelineRequest {
+  string pipeline_id = 1;
+}
+
+message GetStreamPipelineResponse {
+  StreamPipeline pipeline = 1;
+}
+
+message ListStreamPipelinesRequest {
+}
+
+message ListStreamPipelinesResponse {
+  repeated StreamPipeline pipelines = 1;
+}
+
+message DeleteStreamPipelineRequest {
+  string pipeline_id = 1;
+}
+
+message DeleteStreamPipelineResponse {
+  bool success = 1;
+}
+
+message StartPipelineRequest {
+  string pipeline_id = 1;
+}
+
+message StartPipelineResponse {
+  bool success = 1;
+}
+
+message StopPipelineRequest {
+  string pipeline_id = 1;
+}
+
+message StopPipelineResponse {
+  bool success = 1;
+}

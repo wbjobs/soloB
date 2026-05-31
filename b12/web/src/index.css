@@ -1,0 +1,88 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.ant-layout {
+  min-height: 100vh;
+}
+
+.ant-layout-content {
+  margin: 24px 16px;
+  padding: 24px;
+  background: #fff;
+  min-height: calc(100vh - 180px);
+}
+
+.job-card {
+  margin-bottom: 16px;
+  transition: box-shadow 0.3s;
+}
+
+.job-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.status-tag {
+  margin-right: 8px;
+}
+
+.dag-container {
+  padding: 20px;
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.dag-node {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border: 2px solid #d9d9d9;
+  border-radius: 4px;
+  background: white;
+  margin: 4px;
+}
+
+.dag-node.running {
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.dag-node.completed {
+  border-color: #52c41a;
+  background: #f6ffed;
+}
+
+.dag-node.failed {
+  border-color: #ff4d4f;
+  background: #fff2f0;
+}
+
+.dag-edge {
+  color: #bfbfbf;
+  font-size: 20px;
+}
+
+.metrics-card {
+  text-align: center;
+}
+
+.metrics-value {
+  font-size: 32px;
+  font-weight: bold;
+  color: #1890ff;
+}
+
+.metrics-label {
+  color: #8c8c8c;
+  margin-top: 4px;
+}

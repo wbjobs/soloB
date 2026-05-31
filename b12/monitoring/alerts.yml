@@ -1,0 +1,56 @@
+groups:
+  - name: dts_alerts
+    rules:
+      - alert: TaskFailed
+        expr: sum by (job_id, task_id) (increase(dts_tasks_total{status="failed"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Task {{ $labels.task_id }} failed"
+          description: "Task in job {{ $labels.job_id }} has failed"
+
+      - alert: TaskTimeout
+        expr: sum by (job_id, task_id) (increase(dts_tasks_total{status="timeout"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Task {{ $labels.task_id }} timed out"
+          description: "Task in job {{ $labels.job_id }} exceeded timeout"
+
+      - alert: HighExecutorLoad
+        expr: dts_executor_load > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High load on executor {{ $labels.executor_id }}"
+          description: "Executor load is above 90%"
+
+      - alert: PipelineErrors
+        expr: sum by (pipeline_id) (increase(dts_pipeline_errors_total[10m])) > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate in pipeline {{ $labels.pipeline_id }}"
+          description: "Pipeline has more than 10 errors in 10 minutes"
+
+      - alert: HighAPILatency
+        expr: histogram_quantile(0.95, sum by (path) (rate(dts_api_request_duration_seconds_bucket[5m]))) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API latency"
+          description: "95th percentile API latency is above 1 second"
+
+      - alert: NoLeader
+        expr: dts_jobs_active == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No scheduler leader elected"
+          description: "Scheduler cluster has no active leader"

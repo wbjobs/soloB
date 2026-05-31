@@ -1,0 +1,132 @@
+scheduler:
+  name: scheduler-01
+  port: 50051
+  http_port: 8080
+  etcd_endpoints:
+    - "localhost:2379"
+  election_ttl: 10
+  executor_lease_ttl: 5
+  executor_timeout: 15
+
+executor:
+  name: executor-01
+  scheduler_addr: "localhost:50051"
+  port: 50052
+  max_tasks: 10
+  heartbeat_interval: 2
+  lease_ttl: 5
+
+streaming:
+  name: streaming-01
+  scheduler_addr: "localhost:50051"
+  kafka_brokers:
+    - "localhost:9092"
+  consumer_group: "dts-streaming"
+
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: dtsplatform
+  sslmode: disable
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+minio:
+  endpoint: "localhost:9000"
+  access_key: "minioadmin"
+  secret_key: "minioadmin"
+  bucket: "dts-logs"
+  ssl: false
+
+monitoring:
+  prometheus_port: 9090
+  grafana_url: "http://localhost:3000"
+
+alerting:
+  webhooks:
+    - type: "dingtalk"
+      url: "https://oapi.dingtalk.com/robot/send?access_token=xxx"
+    - type: "wechat"
+      url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+    - type: "email"
+      smtp_server: "smtp.example.com"
+      smtp_port: 587
+      from: "alerts@example.com"
+      to: ["admin@example.com"]
+
+auto_scaling:
+  enabled: false
+  scale_interval_seconds: 30
+  kubernetes_namespace: "dtsplatform"
+  executor_deployment_name: "dts-executor"
+  executor_label: "dts-executor"
+  hpa_name: "dts-executor-hpa"
+  policy:
+    min_executors: 1
+    max_executors: 10
+    cpu_threshold_high: 0.8
+    cpu_threshold_low: 0.3
+    memory_threshold_high: 0.8
+    memory_threshold_low: 0.3
+    queue_threshold_high: 100
+    queue_threshold_low: 10
+    scale_up_cooldown_minutes: 5
+    scale_down_cooldown_minutes: 10
+    use_hpa: true
+    use_vpa: false
+
+tenancy:
+  enabled: false
+  default_namespace: "default"
+  isolation_mode: "namespace"
+  enable_namespace_prefix: true
+  default_quota:
+    max_concurrent_jobs: 10
+    max_total_tasks: 50
+    max_executors: 3
+    max_cpu: 16.0
+    max_memory_gb: 32.0
+    max_storage_gb: 100.0
+    max_daily_executions: 1000
+    max_task_timeout_minutes: 120
+    max_retries_per_task: 5
+
+retry:
+  enabled: true
+  enable_circuit_breaker: true
+  default_policy:
+    max_retries: 3
+    retry_delay_ms: 1000
+    max_delay_ms: 60000
+    backoff_multiplier: 2.0
+    strategies: ["network", "timeout", "resource", "unknown"]
+    failure_threshold: 5
+    fuse_window_minutes: 5
+  retryable_errors:
+    network_patterns:
+      - "connection refused"
+      - "connection reset"
+      - "network is unreachable"
+      - "no route to host"
+      - "i/o timeout"
+    timeout_patterns:
+      - "deadline exceeded"
+      - "context deadline exceeded"
+      - "timeout"
+      - "request took too long"
+    resource_patterns:
+      - "insufficient memory"
+      - "out of memory"
+      - "not enough disk space"
+      - "resource temporarily unavailable"
+
+lineage:
+  enabled: true
+  auto_analyze: true
+  enable_rerun: true
+  analysis_timeout_ms: 5000

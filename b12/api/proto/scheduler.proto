@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package scheduler;
+option go_package = "api/proto;scheduler";
+
+service SchedulerService {
+  rpc RegisterExecutor(RegisterExecutorRequest) returns (RegisterExecutorResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
+  rpc UpdateTaskStatus(UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse);
+  rpc SubmitTaskLog(SubmitTaskLogRequest) returns (SubmitTaskLogResponse);
+}
+
+message RegisterExecutorRequest {
+  string executor_id = 1;
+  string address = 2;
+  int32 max_tasks = 3;
+  repeated string supported_types = 4;
+}
+
+message RegisterExecutorResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message HeartbeatRequest {
+  string executor_id = 1;
+  int32 current_load = 2;
+  repeated string running_tasks = 3;
+}
+
+message HeartbeatResponse {
+  bool alive = 1;
+  string instruction = 2;
+}
+
+message GetTaskRequest {
+  string executor_id = 1;
+}
+
+message GetTaskResponse {
+  bool has_task = 1;
+  Task task = 2;
+}
+
+message Task {
+  string task_id = 1;
+  string job_id = 2;
+  string type = 3;
+  bytes payload = 4;
+  int32 retries = 5;
+  int32 max_retries = 6;
+  int64 timeout = 7;
+  repeated string dependencies = 8;
+  int32 shard_index = 9;
+  int32 total_shards = 10;
+}
+
+message UpdateTaskStatusRequest {
+  string task_id = 1;
+  TaskStatus status = 2;
+  string message = 3;
+  int64 start_time = 4;
+  int64 end_time = 5;
+  bytes result = 6;
+}
+
+message UpdateTaskStatusResponse {
+  bool success = 1;
+}
+
+message SubmitTaskLogRequest {
+  string task_id = 1;
+  bytes log_data = 2;
+  bool is_complete = 3;
+}
+
+message SubmitTaskLogResponse {
+  bool success = 1;
+}
+
+enum TaskStatus {
+  PENDING = 0;
+  RUNNING = 1;
+  COMPLETED = 2;
+  FAILED = 3;
+  TIMEOUT = 4;
+  SKIPPED = 5;
+}
