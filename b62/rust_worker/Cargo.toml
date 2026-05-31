@@ -1,0 +1,23 @@
+[package]
+name = "rust_worker"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasmtime = "17.0"
+wasmtime-wasi = "17.0"
+anyhow = "1.0"
+thiserror = "1.0"
+image = "0.24"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+tokio = { version = "1.0", features = ["full"] }
+tonic = "0.10"
+prost = "0.12"
+
+[build-dependencies]
+tonic-build = "0.10"
