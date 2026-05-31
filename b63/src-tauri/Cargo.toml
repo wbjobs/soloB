@@ -1,0 +1,38 @@
+[package]
+name = "solo-ops-tool"
+version = "0.1.0"
+description = "跨平台桌面运维工具"
+authors = ["Solo"]
+edition = "2021"
+
+[lib]
+name = "solo_ops_tool_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["shell-open"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sysinfo = { version = "0.30", features = ["serde"] }
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+async-trait = "0.1"
+dirs = "5"
+toml = "0.8"
+notify = "6"
+chrono = { version = "0.4", features = ["serde"] }
+tokio-pty = { version = "0.14", optional = true }
+portable-pty = { version = "0.4", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winapi = "0.3"
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.27"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
