@@ -1,0 +1,20 @@
+{
+  "name": "redstone-simulator",
+  "version": "1.0.0",
+  "description": "Minecraft Redstone Circuit Simulator with Three.js and Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": ["redstone", "minecraft", "threejs", "electron"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "ws": "^8.16.0"
+  }
+}

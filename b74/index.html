@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redstone Simulator</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      background: #1a1a2e;
+    }
+    
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+    
+    #sidebar {
+      width: 280px;
+      background: #16213e;
+      padding: 20px;
+      color: white;
+      overflow-y: auto;
+    }
+    
+    #canvas-container {
+      flex: 1;
+      position: relative;
+    }
+    
+    canvas {
+      display: block;
+    }
+    
+    .section {
+      margin-bottom: 25px;
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e94560;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .component-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    
+    .component-btn {
+      padding: 10px 5px;
+      background: #0f3460;
+      border: 2px solid transparent;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      font-size: 11px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    
+    .component-btn:hover {
+      background: #1a4a7a;
+    }
+    
+    .component-btn.selected {
+      border-color: #e94560;
+      background: #e94560;
+    }
+    
+    .component-icon {
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+    
+    .control-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    
+    .btn {
+      flex: 1;
+      padding: 10px 15px;
+      background: #e94560;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    
+    .btn:hover {
+      background: #ff6b6b;
+    }
+    
+    .btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    
+    .btn-secondary {
+      background: #0f3460;
+    }
+    
+    .btn-secondary:hover {
+      background: #1a4a7a;
+    }
+    
+    .info-panel {
+      background: #0f3460;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    
+    .info-label {
+      color: #8892b0;
+    }
+    
+    .info-value {
+      color: #e94560;
+      font-weight: 600;
+    }
+    
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .speed-control label {
+      font-size: 12px;
+      color: #8892b0;
+    }
+    
+    .speed-control input {
+      flex: 1;
+    }
+    
+    #status-bar {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      padding: 8px 15px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+    
+    .status-connected {
+      color: #4ade80;
+    }
+    
+    .status-disconnected {
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="sidebar">
+      <div class="section">
+        <div class="section-title">Components</div>
+        <div class="component-grid">
+          <button class="component-btn selected" data-component="air">
+            <div class="component-icon">🗑️</div>
+            <div>Eraser</div>
+          </button>
+          <button class="component-btn" data-component="block">
+            <div class="component-icon">🧱</div>
+            <div>Block</div>
+          </button>
+          <button class="component-btn" data-component="redstone">
+            <div class="component-icon">🔴</div>
+            <div>Redstone</div>
+          </button>
+          <button class="component-btn" data-component="repeater">
+            <div class="component-icon">⏩</div>
+            <div>Repeater</div>
+          </button>
+          <button class="component-btn" data-component="comparator">
+            <div class="component-icon">⚖️</div>
+            <div>Comparator</div>
+          </button>
+          <button class="component-btn" data-component="torch">
+            <div class="component-icon">🔥</div>
+            <div>Torch</div>
+          </button>
+          <button class="component-btn" data-component="lever">
+            <div class="component-icon">🔘</div>
+            <div>Lever</div>
+          </button>
+          <button class="component-btn" data-component="piston">
+            <div class="component-icon">⬆️</div>
+            <div>Piston</div>
+          </button>
+          <button class="component-btn" data-component="lamp">
+            <div class="component-icon">💡</div>
+            <div>Lamp</div>
+          </button>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Simulation</div>
+        <div class="control-group">
+          <button class="btn" id="btn-play">▶ Play</button>
+          <button class="btn btn-secondary" id="btn-step">⏭ Step</button>
+        </div>
+        <div class="control-group">
+          <button class="btn btn-secondary" id="btn-reset">↻ Reset</button>
+        </div>
+        <div class="speed-control">
+          <label>Speed:</label>
+          <input type="range" id="speed-slider" min="1" max="20" value="5">
+          <span id="speed-value">5</span>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">File</div>
+        <div class="control-group">
+          <button class="btn btn-secondary" id="btn-export">💾 Export</button>
+          <button class="btn btn-secondary" id="btn-import">📂 Import</button>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">📊 Frequency Analyzer</div>
+        <div class="info-panel">
+          <div class="info-row">
+            <span class="info-label">Monitoring:</span>
+            <span class="info-value" id="monitoring-pos">None</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Frequency:</span>
+            <span class="info-value" id="signal-frequency">0 Hz</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Duty Cycle:</span>
+            <span class="info-value" id="duty-cycle">0%</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">High Freq Nodes:</span>
+            <span class="info-value" id="high-freq-count">0</span>
+          </div>
+          <div style="margin-top: 10px;">
+            <canvas id="waveform-canvas" width="240" height="60" style="background: #0a1628; border-radius: 4px;"></canvas>
+          </div>
+          <div class="control-group" style="margin-top: 10px;">
+            <button class="btn btn-secondary" id="btn-clear-analyzer">Clear</button>
+            <button class="btn btn-secondary" id="btn-auto-monitor">Auto</button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Info</div>
+        <div class="info-panel">
+          <div class="info-row">
+            <span class="info-label">Tick:</span>
+            <span class="info-value" id="tick-count">0</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Components:</span>
+            <span class="info-value" id="component-count">0</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Selected:</span>
+            <span class="info-value" id="selected-component">Eraser</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Controls</div>
+        <div class="info-panel" style="font-size: 11px; line-height: 1.6;">
+          <div>🖱️ Left Click: Place block</div>
+          <div>🖱️ Right Click: Rotate component</div>
+          <div>🖱️ Drag: Rotate camera</div>
+          <div>🔄 Scroll: Zoom</div>
+          <div>⌨️ Space: Pause/Play</div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="canvas-container">
+      <div id="status-bar">
+        <span id="connection-status" class="status-disconnected">● Disconnected</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

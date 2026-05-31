@@ -1,0 +1,105 @@
+{
+  "grid_size": 16,
+  "tick": 0,
+  "blocks": [
+    {
+      "x": 5,
+      "y": 1,
+      "z": 5,
+      "type": "lever",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 5,
+      "type": "redstone",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 5,
+      "type": "redstone",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 5,
+      "type": "redstone",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 9,
+      "y": 1,
+      "z": 5,
+      "type": "repeater",
+      "rotation": 1,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 10,
+      "y": 1,
+      "z": 5,
+      "type": "redstone",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 11,
+      "y": 1,
+      "z": 5,
+      "type": "lamp",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 7,
+      "type": "block",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 7,
+      "type": "torch",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 7,
+      "type": "redstone",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 7,
+      "type": "lamp",
+      "rotation": 0,
+      "delay": 1,
+      "powered": false
+    }
+  ]
+}
