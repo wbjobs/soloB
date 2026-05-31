@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>卫星图像超分辨率 - WebGPU</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>卫星图像超分辨率处理系统</h1>
+            <p>WebGPU + ESPCN 实时4倍放大 | 时序超分 · 变化检测</p>
+        </header>
+
+        <div class="controls">
+            <div class="file-upload">
+                <label for="fileInput">选择GeoTIFF文件:</label>
+                <input type="file" id="fileInput" accept=".tif,.tiff">
+                <button id="loadBtn" disabled>加载图像</button>
+            </div>
+            
+            <div class="view-controls">
+                <button id="compareBtn">对比视图</button>
+                <button id="heatmapBtn">差异热力图</button>
+                <button id="terrainBtn">3D地形</button>
+                <button id="temporalBtn" class="featured-btn">时序超分</button>
+            </div>
+        </div>
+
+        <div class="temporal-panel" id="temporalPanel" style="display: none;">
+            <h3>时序超分处理</h3>
+            <div class="temporal-upload-area">
+                <div class="upload-section">
+                    <label>多时序图像批量上传:</label>
+                    <input type="file" id="temporalFileInput" accept=".tif,.tiff" multiple>
+                    <button id="addTemporalBtn">添加到序列</button>
+                </div>
+                <div class="sequence-controls">
+                    <button id="processTemporalBtn" disabled>执行时序超分</button>
+                    <button id="detectChangesBtn" disabled>检测变化</button>
+                    <button id="clearSequenceBtn">清空序列</button>
+                </div>
+            </div>
+            
+            <div class="sequence-list" id="sequenceList">
+                <div class="empty-hint">尚未添加时序图像，请上传同一地区不同时间的卫星图像</div>
+            </div>
+            
+            <div class="temporal-options">
+                <label>
+                    <input type="checkbox" id="useAttentionFusion" checked>
+                    使用注意力融合（推荐）
+                </label>
+                <label>
+                    <input type="checkbox" id="enableDenoise" checked>
+                    时序去噪
+                </label>
+                <label>
+                    融合强度:
+                    <input type="range" id="fusionStrength" min="0" max="100" value="70">
+                    <span id="fusionValue">70%</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="animation-panel" id="animationPanel" style="display: none;">
+            <h3>变化检测动画</h3>
+            <div class="animation-viewer">
+                <canvas id="animationCanvas"></canvas>
+                <div class="frame-info">
+                    <span id="frameLabel">帧 1/1</span>
+                    <span id="dateLabel"></span>
+                </div>
+            </div>
+            <div class="animation-controls">
+                <button id="prevFrameBtn">⏮</button>
+                <button id="playBtn">▶️ 播放</button>
+                <button id="pauseBtn" style="display: none;">⏸ 暂停</button>
+                <button id="nextFrameBtn">⏭</button>
+                <div class="speed-control">
+                    <label>速度:</label>
+                    <select id="speedSelect">
+                        <option value="2000">0.5x</option>
+                        <option value="1000" selected>1x</option>
+                        <option value="500">2x</option>
+                        <option value="250">4x</option>
+                    </select>
+                </div>
+                <button id="exportGifBtn">📥 导出GIF</button>
+                <button id="exportVideoBtn">📥 导出视频</button>
+            </div>
+            <input type="range" id="timelineSlider" min="0" max="100" value="0" class="timeline">
+            <div class="change-stats" id="changeStats">
+                <div class="stat-item">
+                    <span class="stat-label">总变化区域:</span>
+                    <span class="stat-value" id="totalChange">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">最大变化率:</span>
+                    <span class="stat-value" id="maxChange">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">平均变化:</span>
+                    <span class="stat-value" id="avgChange">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="gpu-info-panel" id="gpuInfoPanel">
+            <h3>GPU 能力检测</h3>
+            <div id="gpuInfoContent">
+                <div class="gpu-detecting">
+                    <span class="spinner"></span>
+                    <span>正在检测GPU能力...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="render-backend-panel" id="renderBackendPanel" style="display: none;">
+            <h3>渲染后端</h3>
+            <div class="backend-selector">
+                <label>
+                    <input type="radio" name="backend" value="webgpu" disabled>
+                    <span class="backend-name">WebGPU (GPU加速)</span>
+                    <span class="backend-status" id="webgpuStatus">-</span>
+                </label>
+                <label>
+                    <input type="radio" name="backend" value="cpu" checked>
+                    <span class="backend-name">CPU (ONNX Runtime)</span>
+                    <span class="backend-status">兼容模式</span>
+                </label>
+                <label>
+                    <input type="radio" name="backend" value="webgl">
+                    <span class="backend-name">WebGL 2.0</span>
+                    <span class="backend-status" id="webglStatus">-</span>
+                </label>
+            </div>
+            <div class="backend-hint" id="backendHint"></div>
+        </div>
+
+        <div class="metadata-panel" id="metadataPanel">
+            <h3>GeoTIFF 元数据</h3>
+            <div id="metadataContent"></div>
+        </div>
+
+        <div class="main-content">
+            <div class="image-viewer" id="imageViewer">
+                <div class="view-section original-view">
+                    <h3>原始图像 (低分辨率)</h3>
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+                
+                <div class="view-section superres-view">
+                    <h3>超分辨率 (4x)</h3>
+                    <canvas id="superresCanvas"></canvas>
+                </div>
+            </div>
+
+            <div class="slider-container" id="sliderContainer">
+                <input type="range" id="compareSlider" min="0" max="100" value="50">
+                <div class="compare-overlay">
+                    <canvas id="compareCanvas"></canvas>
+                </div>
+            </div>
+
+            <div class="heatmap-container" id="heatmapContainer" style="display: none;">
+                <h3>差异热力图</h3>
+                <canvas id="heatmapCanvas"></canvas>
+                <div class="heatmap-legend">
+                    <span>低差异</span>
+                    <div class="gradient-bar"></div>
+                    <span>高差异</span>
+                </div>
+            </div>
+
+            <div class="terrain-container" id="terrainContainer" style="display: none;">
+                <h3>3D地形预览</h3>
+                <div id="terrainCanvas"></div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="statusText">就绪 - 请选择GeoTIFF文件</span>
+            <span id="perfStats"></span>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
