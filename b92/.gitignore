@@ -1,0 +1,31 @@
+# Rust
+/target
+Cargo.lock
+
+# WASM
+/pkg
+/pkg-*
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+.env
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
