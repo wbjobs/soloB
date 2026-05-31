@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plc_program>
+    <name>Simple Motor Control</name>
+    <description>A basic motor start/stop circuit with timer and counter</description>
+    
+    <inputs>
+        <io name="Start Button" address="I0.0"/>
+        <io name="Stop Button" address="I0.1"/>
+        <io name="Sensor Input" address="I0.2"/>
+    </inputs>
+    
+    <outputs>
+        <io name="Motor Output" address="Q0.0"/>
+        <io name="Timer Done Light" address="Q0.1"/>
+        <io name="Counter Done Light" address="Q0.2"/>
+    </outputs>
+    
+    <rungs>
+        <rung id="1">
+            <logic>Motor Latch Circuit</logic>
+            <elements>
+                <no_contact id="1" name="Start NO" address="I0.0"/>
+                <nc_contact id="2" name="Stop NC" address="I0.1"/>
+                <coil id="3" name="Motor Coil" address="Q0.0"/>
+            </elements>
+        </rung>
+        
+        <rung id="2">
+            <logic>Timer Circuit - 5 cycles delay</logic>
+            <elements>
+                <no_contact id="4" name="Motor Running" address="I0.0"/>
+                <timer id="5" name="Run Timer" address="T0" preset="5" time_base="1.0"/>
+            </elements>
+        </rung>
+        
+        <rung id="3">
+            <logic>Timer Output Indicator</logic>
+            <elements>
+                <timer id="6" name="Timer Done" address="T0" preset="5"/>
+                <coil id="7" name="Timer Light" address="Q0.1"/>
+            </elements>
+        </rung>
+        
+        <rung id="4">
+            <logic>Counter Circuit - count sensor pulses</logic>
+            <elements>
+                <no_contact id="8" name="Sensor" address="I0.2"/>
+                <counter id="9" name="Part Counter" address="C0" preset="10"/>
+            </elements>
+        </rung>
+        
+        <rung id="5">
+            <logic>Counter Complete Indicator</logic>
+            <elements>
+                <counter id="10" name="Counter Done" address="C0" preset="10"/>
+                <coil id="11" name="Counter Light" address="Q0.2"/>
+            </elements>
+        </rung>
+    </rungs>
+</plc_program>

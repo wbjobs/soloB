@@ -1,0 +1,49 @@
+<?xml version="1.0" ?>
+<plc_program>
+    <name>Reverse Engineered Program</name>
+    <description>Generated from Python code</description>
+    <inputs>
+        <io name="Input I0.0" address="I0.0"/>
+        <io name="Input I0.1" address="I0.1"/>
+        <io name="Input I0.2" address="I0.2"/>
+    </inputs>
+    <outputs>
+        <io name="Output Q0.0" address="Q0.0"/>
+        <io name="Output Q0.1" address="Q0.1"/>
+        <io name="Output Q0.2" address="Q0.2"/>
+    </outputs>
+    <rungs>
+        <rung id="1">
+            <logic>Motor Latch Circuit</logic>
+            <elements>
+                <no_contact id="2" name="Start I0.0" address="I0.0"/>
+                <nc_contact id="3" name="Stop I0.1" address="I0.1"/>
+                <coil id="1" name="Coil Q0.0" address="Q0.0"/>
+            </elements>
+        </rung>
+        <rung id="2">
+            <logic>Timer Circuit - 5 cycles delay</logic>
+            <elements/>
+        </rung>
+        <rung id="3">
+            <logic>Timer Output Indicator</logic>
+            <elements>
+                <no_contact id="5" name="Start I0.0" address="I0.0"/>
+                <nc_contact id="6" name="Stop I0.1" address="I0.1"/>
+                <coil id="4" name="Coil Q0.1" address="Q0.1"/>
+            </elements>
+        </rung>
+        <rung id="4">
+            <logic>Counter Circuit - count sensor pulses</logic>
+            <elements/>
+        </rung>
+        <rung id="5">
+            <logic>Counter Complete Indicator</logic>
+            <elements>
+                <no_contact id="8" name="Start I0.0" address="I0.0"/>
+                <nc_contact id="9" name="Stop I0.1" address="I0.1"/>
+                <coil id="7" name="Coil Q0.2" address="Q0.2"/>
+            </elements>
+        </rung>
+    </rungs>
+</plc_program>
