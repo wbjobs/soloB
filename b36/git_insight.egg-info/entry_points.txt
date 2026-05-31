@@ -1,0 +1,2 @@
+[console_scripts]
+git-insight = git_insight.cli:cli

@@ -1,0 +1,11 @@
+setup.py
+git_insight/__init__.py
+git_insight/cli.py
+git_insight/git_utils.py
+git_insight/report.py
+git_insight.egg-info/PKG-INFO
+git_insight.egg-info/SOURCES.txt
+git_insight.egg-info/dependency_links.txt
+git_insight.egg-info/entry_points.txt
+git_insight.egg-info/requires.txt
+git_insight.egg-info/top_level.txt
