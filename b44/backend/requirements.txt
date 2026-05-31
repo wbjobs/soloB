@@ -1,0 +1,4 @@
+Flask==2.3.3
+elasticsearch==7.17.9
+python-dateutil==2.8.2
+flask-cors==4.0.0

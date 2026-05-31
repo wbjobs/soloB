@@ -1,0 +1,2 @@
+bcc==0.28.0
+kafka-python==2.0.2
