@@ -1,0 +1,28 @@
+{
+  "name": "secure-notes",
+  "version": "1.0.0",
+  "description": "Cross-platform secure desktop notes application with Rust encryption",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "start": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build:rust": "cargo build",
+    "build:rust:release": "cargo build --release",
+    "test:rust": "cargo test",
+    "install:all": "npm install && cargo build"
+  },
+  "dependencies": {
+    "electron": "^28.0.0",
+    "vue": "^3.4.0",
+    "marked": "^12.0.0",
+    "highlight.js": "^11.9.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "concurrently": "^8.2.0",
+    "vite": "^5.0.0",
+    "wait-on": "^7.2.0"
+  }
+}
