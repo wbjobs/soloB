@@ -1,0 +1,51 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  background-color: #282c34;
+  color: white;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.time-range-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.time-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: #3a3f47;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.time-btn:hover {
+  background-color: #4a4f57;
+}
+
+.time-btn.active {
+  background-color: #61dafb;
+  color: #282c34;
+  font-weight: bold;
+}
+
+.app-main {
+  flex: 1;
+  padding: 20px;
+}
