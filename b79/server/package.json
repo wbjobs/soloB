@@ -1,0 +1,34 @@
+{
+  "name": "lowcode-datasource-server",
+  "version": "1.0.0",
+  "description": "低代码数据源连接器平台后端服务",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "pg": "^8.11.3",
+    "sequelize": "^6.35.2",
+    "dockerode": "^3.3.5",
+    "tar-fs": "^3.0.4",
+    "archiver": "^6.0.1",
+    "uuid": "^9.0.1",
+    "joi": "^17.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/cors": "^2.8.17",
+    "@types/pg": "^8.10.9",
+    "@types/dockerode": "^3.3.23",
+    "@types/tar-fs": "^2.0.4",
+    "@types/archiver": "^6.0.2",
+    "@types/uuid": "^9.0.7",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3",
+    "ts-node-dev": "^2.0.0"
+  }
+}
