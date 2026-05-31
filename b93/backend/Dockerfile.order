@@ -1,0 +1,15 @@
+FROM golang:1.21-alpine
+
+WORKDIR /app
+
+COPY go.mod ./
+RUN go mod download
+
+COPY common/ ./common/
+COPY order/ ./order/
+
+RUN go build -o order-service ./order/main.go
+
+EXPOSE 8081
+
+CMD ["./order-service"]

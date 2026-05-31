@@ -1,0 +1,15 @@
+FROM golang:1.21-alpine
+
+WORKDIR /app
+
+COPY go.mod ./
+RUN go mod download
+
+COPY common/ ./common/
+COPY inventory/ ./inventory/
+
+RUN go build -o inventory-service ./inventory/main.go
+
+EXPOSE 8082
+
+CMD ["./inventory-service"]

@@ -1,0 +1,15 @@
+FROM golang:1.21-alpine
+
+WORKDIR /app
+
+COPY go.mod ./
+RUN go mod download
+
+COPY common/ ./common/
+COPY payment/ ./payment/
+
+RUN go build -o payment-service ./payment/main.go
+
+EXPOSE 8083
+
+CMD ["./payment-service"]

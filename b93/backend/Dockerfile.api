@@ -1,0 +1,15 @@
+FROM golang:1.21-alpine
+
+WORKDIR /app
+
+COPY go.mod ./
+RUN go mod download
+
+COPY common/ ./common/
+COPY api/ ./api/
+
+RUN go build -o api-service ./api/main.go
+
+EXPOSE 8080
+
+CMD ["./api-service"]

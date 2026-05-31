@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调用链分析平台 - Trace Analysis Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        .service-order { background-color: #3b82f6; }
+        .service-inventory { background-color: #10b981; }
+        .service-payment { background-color: #f59e0b; }
+        .service-api { background-color: #8b5cf6; }
+        
+        .slow-span {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .severity-critical {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .severity-warning {
+            border-left: 4px solid #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div id="app">
+        <!-- Header -->
+        <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                    <h1 class="text-2xl font-bold">调用链分析平台</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="generateSlowTrace()" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <span>SQL慢查询场景</span>
+                    </button>
+                    <button onclick="generateNetworkDelayTrace()" class="bg-orange-600 hover:bg-orange-700 px-4 py-2 rounded-lg transition flex items-center space-x-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path>
+                        </svg>
+                        <span>网络延迟场景 (RCA验证)</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="p-6">
+            <!-- Smart Sampling Dashboard -->
+            <section class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold flex items-center">
+                        <svg class="w-6 h-6 mr-2 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        智能降采样控制中心
+                    </h2>
+                    <button onclick="refreshSamplingStats()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm">
+                        刷新数据
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-5 gap-4 mb-6" id="samplingStats">
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="text-sm text-gray-400 mb-1">当前QPS</div>
+                        <div class="text-3xl font-bold text-blue-400" id="currentQPS">0</div>
+                        <div class="text-xs text-gray-500 mt-1" id="qpsStatus">正常负载</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="text-sm text-gray-400 mb-1">总Trace数</div>
+                        <div class="text-3xl font-bold text-green-400" id="totalTraces">0</div>
+                        <div class="text-xs text-gray-500 mt-1">累计处理</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="text-sm text-gray-400 mb-1">已采样</div>
+                        <div class="text-3xl font-bold text-emerald-400" id="sampledTraces">0</div>
+                        <div class="text-xs text-gray-500 mt-1" id="sampleRate">采样率: 100%</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="text-sm text-gray-400 mb-1">已丢弃</div>
+                        <div class="text-3xl font-bold text-orange-400" id="droppedTraces">0</div>
+                        <div class="text-xs text-gray-500 mt-1" id="savingsRate">存储节省: 0%</div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="text-sm text-gray-400 mb-1">采样模式</div>
+                        <div class="text-2xl font-bold" id="sampleMode">正常模式</div>
+                        <div class="text-xs text-gray-500 mt-1" id="modeDescription">QPS阈值: 1000</div>
+                    </div>
+                </div>
+
+                <!-- Sampling Simulator -->
+                <div class="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
+                    <h3 class="font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548-.547A3.374 3.374 0 0014.8 9.2V9.2a1 1 0 011-1h.3a2.3 2.3 0 110 4.6h-.3a1 1 0 01-1-1v-.1a3.375 3.375 0 00-1.179 2.674l.548.548a5 5 0 01-7.072 0z"></path>
+                        </svg>
+                        采样决策模拟器
+                    </h3>
+                    <div class="grid grid-cols-5 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">请求路径</label>
+                            <select id="simPath" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
+                                <option value="/health">/health (健康检查)</option>
+                                <option value="/api/orders">/api/orders (核心接口)</option>
+                                <option value="/api/inventory/reserve">/api/inventory/reserve (核心接口)</option>
+                                <option value="/api/users">/api/users (普通查询)</option>
+                                <option value="/api/products">/api/products (普通查询)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">请求方法</label>
+                            <select id="simMethod" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">所属服务</label>
+                            <select id="simService" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
+                                <option value="order-service">order-service</option>
+                                <option value="inventory-service">inventory-service</option>
+                                <option value="payment-service">payment-service</option>
+                                <option value="api-service">api-service</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">耗时(ms)</label>
+                            <input type="number" id="simDuration" value="50" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-1">模拟QPS</label>
+                            <input type="number" id="simQPS" value="1500" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4 mb-4">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="simError" class="mr-2">
+                            <span class="text-sm">是否有错误</span>
+                        </label>
+                        <button onclick="runSamplingSimulation()" class="bg-cyan-600 hover:bg-cyan-700 px-6 py-2 rounded-lg font-medium">
+                            运行模拟
+                        </button>
+                    </div>
+                    <div id="simulationResult" class="hidden bg-gray-900 rounded-lg p-4">
+                        <!-- Simulation result will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Priority Rules -->
+                <div class="bg-gray-800 rounded-lg p-6 border border-gray-700">
+                    <h3 class="font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                        优先级规则配置
+                    </h3>
+                    <div class="grid grid-cols-1 gap-3" id="priorityRules">
+                        <!-- Rules will be rendered here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Service Status Overview -->
+            <section class="mb-8">
+                <h2 class="text-xl font-semibold mb-4">服务状态</h2>
+                <div class="grid grid-cols-4 gap-4" id="serviceStatus">
+                    <div class="bg-gray-800 rounded-lg p-4 service-order">
+                        <div class="text-sm opacity-80">订单服务</div>
+                        <div class="text-2xl font-bold">order-service</div>
+                        <div class="text-sm mt-2 flex items-center">
+                            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                            健康
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 service-inventory">
+                        <div class="text-sm opacity-80">库存服务</div>
+                        <div class="text-2xl font-bold">inventory-service</div>
+                        <div class="text-sm mt-2 flex items-center">
+                            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                            健康
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 service-payment">
+                        <div class="text-sm opacity-80">支付服务</div>
+                        <div class="text-2xl font-bold">payment-service</div>
+                        <div class="text-sm mt-2 flex items-center">
+                            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                            健康
+                        </div>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-4 service-api">
+                        <div class="text-sm opacity-80">API服务</div>
+                        <div class="text-2xl font-bold">api-service</div>
+                        <div class="text-sm mt-2 flex items-center">
+                            <span class="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
+                            健康
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trace List -->
+            <section class="mb-8">
+                <h2 class="text-xl font-semibold mb-4">调用链列表</h2>
+                <div class="bg-gray-800 rounded-lg overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Trace ID</th>
+                                <th class="px-4 py-3 text-left">耗时</th>
+                                <th class="px-4 py-3 text-left">Span数量</th>
+                                <th class="px-4 py-3 text-left">时间</th>
+                                <th class="px-4 py-3 text-left">状态</th>
+                                <th class="px-4 py-3 text-left">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="traceList">
+                            <tr>
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+                                    点击"生成慢调用示例"按钮创建示例数据
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Selected Trace Analysis -->
+            <section id="analysisSection" class="hidden mb-8">
+                <h2 class="text-xl font-semibold mb-4">根因分析 - <span id="analysisTraceId"></span></h2>
+                
+                <!-- Topology Graph -->
+                <div class="grid grid-cols-2 gap-6 mb-6">
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <h3 class="font-semibold mb-3">调用链拓扑图</h3>
+                        <div id="topologyChart" style="height: 400px;"></div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-lg p-4">
+                        <h3 class="font-semibold mb-3">时序瀑布图</h3>
+                        <div id="timelineChart" style="height: 400px;"></div>
+                    </div>
+                </div>
+
+                <!-- Root Cause Analysis Results -->
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-semibold text-lg">根因分析结果</h3>
+                        <div id="totalTime" class="text-2xl font-bold text-red-400"></div>
+                    </div>
+                    <div id="rootCauseList" class="space-y-4">
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api';
+        let currentTraceId = null;
+
+        const serviceColors = {
+            'order-service': '#3b82f6',
+            'inventory-service': '#10b981',
+            'payment-service': '#f59e0b',
+            'api-service': '#8b5cf6'
+        };
+
+        async function generateSlowTrace() {
+            try {
+                const response = await fetch(`${API_BASE}/generate-slow-trace`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                alert(`已生成SQL慢查询场景: ${data.traceId}\n\n该场景中SQL执行时间占比高，RCA应识别为SLOW_SQL`);
+                await loadTraceList();
+                await analyzeTrace(data.traceId);
+            } catch (error) {
+                console.error('Error generating slow trace:', error);
+                alert('生成失败，请确保API服务已启动');
+            }
+        }
+
+        async function generateNetworkDelayTrace() {
+            try {
+                const response = await fetch(`${API_BASE}/generate-network-delay`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                alert(`已生成网络延迟场景: ${data.traceId}\n\n${data.scenario}`);
+                await loadTraceList();
+                await analyzeTrace(data.traceId);
+            } catch (error) {
+                console.error('Error generating network delay trace:', error);
+                alert('生成失败，请确保API服务已启动');
+            }
+        }
+
+        async function loadTraceList() {
+            try {
+                const response = await fetch(`${API_BASE}/traces`);
+                const data = await response.json();
+                renderTraceList(data.traces);
+            } catch (error) {
+                console.error('Error loading traces:', error);
+            }
+        }
+
+        function renderTraceList(traces) {
+            const tbody = document.getElementById('traceList');
+            
+            if (!traces || traces.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="px-4 py-8 text-center text-gray-400">
+                            暂无数据，点击"生成慢调用示例"创建示例
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = traces.map(trace => {
+                const isSlow = trace.duration > 500;
+                return `
+                    <tr class="border-t border-gray-700 hover:bg-gray-750">
+                        <td class="px-4 py-3 font-mono text-sm">${trace.traceId}</td>
+                        <td class="px-4 py-3 ${isSlow ? 'text-red-400 font-bold' : 'text-green-400'}">
+                            ${trace.duration}ms
+                            ${isSlow ? '⚠️' : ''}
+                        </td>
+                        <td class="px-4 py-3">${trace.spanCount}</td>
+                        <td class="px-4 py-3 text-gray-400 text-sm">${new Date(trace.timestamp).toLocaleString()}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded text-xs ${isSlow ? 'bg-red-900 text-red-300' : 'bg-green-900 text-green-300'}">
+                                ${isSlow ? '慢调用' : '正常'}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <button onclick="analyzeTrace('${trace.traceId}')" class="text-blue-400 hover:text-blue-300 text-sm">
+                                查看分析
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function analyzeTrace(traceId) {
+            currentTraceId = traceId;
+            document.getElementById('analysisSection').classList.remove('hidden');
+            document.getElementById('analysisTraceId').textContent = traceId;
+
+            try {
+                const [traceResponse, analysisResponse] = await Promise.all([
+                    fetch(`${API_BASE}/traces/${traceId}`),
+                    fetch(`${API_BASE}/analyze/${traceId}`)
+                ]);
+
+                const traceData = await traceResponse.json();
+                const analysisData = await analysisResponse.json();
+
+                renderTopologyChart(analysisData.topology);
+                renderTimelineChart(traceData.trace.spans);
+                renderRootCauses(analysisData);
+                
+                document.getElementById('totalTime').textContent = `总耗时: ${analysisData.totalTime}ms`;
+            } catch (error) {
+                console.error('Error analyzing trace:', error);
+            }
+        }
+
+        function renderTopologyChart(nodes) {
+            const chartDom = document.getElementById('topologyChart');
+            const chart = echarts.init(chartDom);
+
+            const graphNodes = nodes.map(node => ({
+                id: node.id,
+                name: node.name,
+                category: node.service,
+                symbolSize: Math.max(20, Math.min(60, node.duration / 10)),
+                itemStyle: {
+                    color: serviceColors[node.service] || '#666'
+                }
+            }));
+
+            const graphLinks = [];
+            nodes.forEach(node => {
+                if (node.children) {
+                    node.children.forEach(childId => {
+                        graphLinks.push({
+                            source: node.id,
+                            target: childId
+                        });
+                    });
+                }
+            });
+
+            const categories = Object.keys(serviceColors).map(service => ({
+                name: service,
+                itemStyle: { color: serviceColors[service] }
+            }));
+
+            const option = {
+                tooltip: {
+                    formatter: function(params) {
+                        return `<b>${params.name}</b><br/>服务: ${params.data.category}<br/>耗时: ${params.data.symbolSize * 10}ms`;
+                    }
+                },
+                legend: {
+                    data: Object.keys(serviceColors),
+                    textStyle: { color: '#fff' }
+                },
+                series: [{
+                    type: 'graph',
+                    layout: 'force',
+                    roam: true,
+                    label: {
+                        show: true,
+                        position: 'right',
+                        fontSize: 10,
+                        color: '#fff'
+                    },
+                    draggable: true,
+                    categories: categories,
+                    data: graphNodes,
+                    links: graphLinks,
+                    lineStyle: {
+                        color: 'source',
+                        curveness: 0.3,
+                        width: 2
+                    },
+                    emphasis: {
+                        focus: 'adjacency',
+                        lineStyle: { width: 5 }
+                    },
+                    force: {
+                        repulsion: 200,
+                        edgeLength: 80
+                    }
+                }]
+            };
+
+            chart.setOption(option);
+            window.addEventListener('resize', () => chart.resize());
+        }
+
+        function renderTimelineChart(spans) {
+            const chartDom = document.getElementById('timelineChart');
+            const chart = echarts.init(chartDom);
+
+            const sortedSpans = [...spans].sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+            const baseTime = new Date(sortedSpans[0].startTime).getTime();
+
+            const data = sortedSpans.map((span, index) => {
+                const start = new Date(span.startTime).getTime() - baseTime;
+                const duration = span.duration;
+                return {
+                    name: span.operation,
+                    value: [index, start, start + duration, duration],
+                    itemStyle: {
+                        color: serviceColors[span.serviceName] || '#666'
+                    },
+                    service: span.serviceName,
+                    isSlow: duration > 500
+                };
+            });
+
+            const yAxisData = sortedSpans.map(s => s.operation);
+
+            const option = {
+                tooltip: {
+                    formatter: function(params) {
+                        const isSlow = params.data.isSlow ? ' ⚠️ 慢调用' : '';
+                        return `<b>${params.data.name}</b><br/>
+                                服务: ${params.data.service}<br/>
+                                开始: ${params.data.value[1]}ms<br/>
+                                耗时: ${params.data.value[3]}ms${isSlow}`;
+                    }
+                },
+                grid: {
+                    left: '20%',
+                    right: '10%',
+                    top: '10%',
+                    bottom: '10%'
+                },
+                xAxis: {
+                    type: 'value',
+                    name: '时间 (ms)',
+                    nameTextStyle: { color: '#fff' },
+                    axisLine: { lineStyle: { color: '#666' } },
+                    axisLabel: { color: '#ccc' }
+                },
+                yAxis: {
+                    type: 'category',
+                    data: yAxisData,
+                    axisLine: { lineStyle: { color: '#666' } },
+                    axisLabel: { color: '#ccc', fontSize: 10 }
+                },
+                series: [{
+                    type: 'custom',
+                    renderItem: function(params, api) {
+                        const categoryIndex = api.value(0);
+                        const start = api.coord([api.value(1), categoryIndex]);
+                        const end = api.coord([api.value(2), categoryIndex]);
+                        const height = api.size([0, 1])[1] * 0.6;
+                        
+                        const rectShape = echarts.graphic.clipRectByRect(
+                            {
+                                x: start[0],
+                                y: start[1] - height / 2,
+                                width: end[0] - start[0],
+                                height: height
+                            },
+                            {
+                                x: params.coordSys.x,
+                                y: params.coordSys.y,
+                                width: params.coordSys.width,
+                                height: params.coordSys.height
+                            }
+                        );
+                        
+                        return (
+                            rectShape && {
+                                type: 'rect',
+                                transition: ['shape'],
+                                shape: rectShape,
+                                style: api.style({
+                                    stroke: '#fff',
+                                    lineWidth: params.data.isSlow ? 2 : 0.5
+                                })
+                            }
+                        );
+                    },
+                    encode: {
+                        x: [1, 2],
+                        y: 0
+                    },
+                    data: data
+                }]
+            };
+
+            chart.setOption(option);
+            window.addEventListener('resize', () => chart.resize());
+        }
+
+        function renderRootCauses(analysis) {
+            const container = document.getElementById('rootCauseList');
+            
+            if (!analysis.rootCauses || analysis.rootCauses.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-green-900/30 border border-green-700 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <svg class="w-6 h-6 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span class="text-green-300 font-semibold">未检测到性能瓶颈</span>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = analysis.rootCauses.map(cause => {
+                const severityClass = cause.severity === 'CRITICAL' ? 'severity-critical' : 'severity-warning';
+                const bgClass = cause.severity === 'CRITICAL' ? 'bg-red-900/30' : 'bg-yellow-900/30';
+                
+                const timeBreakdownHtml = cause.timeBreakdown ? renderTimeBreakdown(cause.timeBreakdown) : '';
+                const networkDiagnosticHtml = cause.networkDiagnostic ? renderNetworkDiagnostic(cause.networkDiagnostic) : '';
+                const confidenceHtml = cause.confidence ? renderConfidence(cause.confidence) : '';
+                
+                return `
+                    <div class="${bgClass} ${severityClass} rounded-lg p-4">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <span class="px-2 py-1 rounded text-xs font-bold ${cause.severity === 'CRITICAL' ? 'bg-red-600' : 'bg-yellow-600'} mr-2">
+                                    ${cause.severity}
+                                </span>
+                                <span class="font-semibold">${cause.issueType}</span>
+                                ${confidenceHtml}
+                            </div>
+                            <span class="text-red-400 font-bold">${cause.duration}</span>
+                        </div>
+                        
+                        ${timeBreakdownHtml}
+                        ${networkDiagnosticHtml}
+                        
+                        <div class="grid grid-cols-2 gap-4 text-sm mt-4">
+                            <div>
+                                <div class="text-gray-400 mb-1">服务</div>
+                                <div class="font-mono">${cause.serviceName}</div>
+                            </div>
+                            <div>
+                                <div class="text-gray-400 mb-1">操作</div>
+                                <div class="font-mono">${cause.operation}</div>
+                            </div>
+                            ${cause.codeLocation ? `
+                            <div>
+                                <div class="text-gray-400 mb-1">代码位置</div>
+                                <div class="font-mono text-yellow-300">${cause.codeLocation}</div>
+                            </div>` : ''}
+                            ${cause.sqlStatement ? `
+                            <div class="col-span-2">
+                                <div class="text-gray-400 mb-1">SQL语句</div>
+                                <div class="font-mono text-xs bg-gray-900 p-2 rounded overflow-x-auto">
+                                    ${cause.sqlStatement}
+                                </div>
+                            </div>` : ''}
+                        </div>
+                        
+                        <div class="mt-4 pt-4 border-t border-gray-600">
+                            <div class="text-gray-400 mb-2">分析结论</div>
+                            <p class="text-sm mb-3">${cause.analysis}</p>
+                            
+                            <div class="text-gray-400 mb-2">优化建议</div>
+                            <div class="bg-gray-900/50 rounded p-3 text-sm whitespace-pre-line">
+                                ${cause.suggestion}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTimeBreakdown(timeBreakdown) {
+            const total = timeBreakdown.networkTime + timeBreakdown.processTime + timeBreakdown.queueTime;
+            const networkPercent = total > 0 ? (timeBreakdown.networkTime / total * 100).toFixed(1) : 0;
+            const processPercent = total > 0 ? (timeBreakdown.processTime / total * 100).toFixed(1) : 0;
+            const queuePercent = total > 0 ? (timeBreakdown.queueTime / total * 100).toFixed(1) : 0;
+            
+            return `
+                <div class="bg-gray-800/50 rounded p-3 mb-3">
+                    <div class="text-gray-400 text-sm mb-2">⏱️ 时间分解</div>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-blue-400">🌐 网络传输</span>
+                            <span>${timeBreakdown.networkTime}ms (${networkPercent}%)</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-blue-500 h-2 rounded-full transition-all" style="width: ${networkPercent}%"></div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-green-400">⚙️ 处理时间</span>
+                            <span>${timeBreakdown.processTime}ms (${processPercent}%)</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-green-500 h-2 rounded-full transition-all" style="width: ${processPercent}%"></div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-sm">
+                            <span class="text-yellow-400">⏳ 排队等待</span>
+                            <span>${timeBreakdown.queueTime}ms (${queuePercent}%)</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded-full h-2">
+                            <div class="bg-yellow-500 h-2 rounded-full transition-all" style="width: ${queuePercent}%"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderNetworkDiagnostic(diagnostic) {
+            if (!diagnostic.isNetworkProblem) {
+                return '';
+            }
+            const ratioPercent = (diagnostic.networkDelayRatio * 100).toFixed(1);
+            const severityColor = diagnostic.networkSeverity === 'CRITICAL' ? 'text-red-400' : 'text-yellow-400';
+            
+            return `
+                <div class="bg-purple-900/30 border border-purple-600 rounded p-3 mb-3">
+                    <div class="text-purple-300 text-sm mb-2 font-semibold">🔍 网络问题检测</div>
+                    <div class="text-sm space-y-1">
+                        <div class="flex justify-between">
+                            <span>网络延迟占比:</span>
+                            <span class="${severityColor} font-bold">${ratioPercent}%</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>严重程度:</span>
+                            <span class="${severityColor} font-bold">${diagnostic.networkSeverity}</span>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-2">
+                            ✓ 时序对齐算法正确检测到网络延迟问题
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderConfidence(confidence) {
+            const percentage = (confidence * 100).toFixed(0);
+            let color = 'bg-green-500';
+            let textColor = 'text-green-400';
+            
+            if (confidence < 0.6) {
+                color = 'bg-yellow-500';
+                textColor = 'text-yellow-400';
+            } else if (confidence < 0.8) {
+                color = 'bg-blue-500';
+                textColor = 'text-blue-400';
+            }
+            
+            return `
+                <span class="ml-2 text-xs ${textColor} font-mono bg-gray-800 px-2 py-1 rounded">
+                    置信度: ${percentage}%
+                </span>
+            `;
+        }
+
+        async function refreshSamplingStats() {
+            try {
+                const [statsResponse, rulesResponse] = await Promise.all([
+                    fetch(`${API_BASE}/sampling/stats`),
+                    fetch(`${API_BASE}/sampling/rules`)
+                ]);
+
+                const statsData = await statsResponse.json();
+                const rulesData = await rulesResponse.json();
+
+                renderSamplingStats(statsData);
+                renderPriorityRules(rulesData.rules);
+            } catch (error) {
+                console.error('Error fetching sampling stats:', error);
+            }
+        }
+
+        function renderSamplingStats(data) {
+            document.getElementById('currentQPS').textContent = data.currentQPS.toFixed(1);
+            document.getElementById('totalTraces').textContent = data.totalTraces;
+            document.getElementById('sampledTraces').textContent = data.sampledTraces;
+            document.getElementById('droppedTraces').textContent = data.droppedTraces;
+
+            const qpsElement = document.getElementById('currentQPS');
+            const qpsStatusElement = document.getElementById('qpsStatus');
+            const sampleModeElement = document.getElementById('sampleMode');
+            const modeDescriptionElement = document.getElementById('modeDescription');
+
+            if (data.currentQPS > 1000) {
+                qpsElement.className = 'text-3xl font-bold text-red-400';
+                qpsStatusElement.textContent = '高负载 - 降采样已激活';
+                qpsStatusElement.className = 'text-xs text-red-400 mt-1';
+                sampleModeElement.textContent = '高负载模式';
+                sampleModeElement.className = 'text-2xl font-bold text-red-400';
+            } else if (data.currentQPS > 500) {
+                qpsElement.className = 'text-3xl font-bold text-yellow-400';
+                qpsStatusElement.textContent = '中负载 - 中度降采样';
+                qpsStatusElement.className = 'text-xs text-yellow-400 mt-1';
+                sampleModeElement.textContent = '中负载模式';
+                sampleModeElement.className = 'text-2xl font-bold text-yellow-400';
+            } else {
+                qpsElement.className = 'text-3xl font-bold text-blue-400';
+                qpsStatusElement.textContent = '正常负载';
+                qpsStatusElement.className = 'text-xs text-gray-500 mt-1';
+                sampleModeElement.textContent = '正常模式';
+                sampleModeElement.className = 'text-2xl font-bold text-green-400';
+            }
+
+            modeDescriptionElement.textContent = `QPS阈值: ${data.qpsThreshold}`;
+
+            const actualSampleRate = data.totalTraces > 0
+                ? (data.sampledTraces / data.totalTraces * 100).toFixed(1)
+                : 100;
+            document.getElementById('sampleRate').textContent = `采样率: ${actualSampleRate}%`;
+            document.getElementById('savingsRate').textContent = `存储节省: ${data.savingsRate.toFixed(1)}%`;
+        }
+
+        function renderPriorityRules(rules) {
+            const container = document.getElementById('priorityRules');
+
+            const priorityColors = {
+                'CRITICAL': 'bg-red-600',
+                'HIGH': 'bg-orange-600',
+                'MEDIUM': 'bg-yellow-600',
+                'LOW': 'bg-gray-600'
+            };
+
+            container.innerHTML = rules.map(rule => `
+                <div class="flex items-center justify-between bg-gray-900 rounded-lg p-4">
+                    <div class="flex items-center">
+                        <span class="px-2 py-1 rounded text-xs font-bold ${priorityColors[rule.priority]} mr-3">
+                            ${rule.priority}
+                        </span>
+                        <div>
+                            <div class="font-medium">${rule.name}</div>
+                            <div class="text-sm text-gray-400">${rule.description}</div>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-400">
+                        ${rule.priorityDesc}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function runSamplingSimulation() {
+            const path = document.getElementById('simPath').value;
+            const method = document.getElementById('simMethod').value;
+            const service = document.getElementById('simService').value;
+            const durationMs = parseInt(document.getElementById('simDuration').value);
+            const hasError = document.getElementById('simError').checked;
+            const simulateQPS = parseFloat(document.getElementById('simQPS').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/sampling/simulate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path, method, service, durationMs, hasError, simulateQPS })
+                });
+
+                const result = await response.json();
+                renderSimulationResult(result);
+            } catch (error) {
+                console.error('Error running simulation:', error);
+            }
+        }
+
+        function renderSimulationResult(result) {
+            const container = document.getElementById('simulationResult');
+            container.classList.remove('hidden');
+
+            const statusColor = result.shouldSample ? 'text-green-400' : 'text-gray-400';
+            const statusText = result.shouldSample ? '采样保留' : '采样丢弃';
+            const statusIcon = result.shouldSample ? '✓' : '✗';
+
+            container.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center">
+                        <span class="text-2xl ${statusColor} mr-3">${statusIcon}</span>
+                        <div>
+                            <div class="font-semibold ${statusColor}">${statusText}</div>
+                            <div class="text-sm text-gray-400">${result.reason}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-bold text-blue-400">${(result.sampleRate * 100).toFixed(0)}%</div>
+                        <div class="text-sm text-gray-400">采样率</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-gray-800 rounded p-3">
+                        <div class="text-sm text-gray-400 mb-1">存储成本影响</div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span>原始存储:</span>
+                                <span class="text-yellow-400">${result.storageImpact.originalStorageGB}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>预估存储:</span>
+                                <span class="text-green-400">${result.storageImpact.estimatedStorageGB}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>节省空间:</span>
+                                <span class="text-emerald-400">${result.storageImpact.savingsGB} (${result.storageImpact.savingsPercent})</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>月节省:</span>
+                                <span class="text-cyan-400">${result.storageImpact.monthlySavingsTB}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-800 rounded p-3">
+                        <div class="text-sm text-gray-400 mb-1">根因分析影响</div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span>关键Trace保障:</span>
+                                <span class="${result.rcaImpact.criticalTracesGuaranteed ? 'text-green-400' : 'text-yellow-400'}">
+                                    ${result.rcaImpact.criticalTracesGuaranteed ? '✓ 已保障' : '⚠ 部分丢弃'}
+                                </span>
+                            </div>
+                            <div class="text-gray-300 mt-2">${result.rcaImpact.rcaAccuracyImpact}</div>
+                            <div class="text-gray-400 text-xs mt-1">${result.rcaImpact.recommendation}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 rounded p-3">
+                    <div class="text-sm text-gray-400 mb-2">请求信息</div>
+                    <div class="grid grid-cols-4 gap-4 text-sm">
+                        <div>
+                            <span class="text-gray-400">路径:</span>
+                            <span class="ml-2 font-mono">${document.getElementById('simPath').value}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">方法:</span>
+                            <span class="ml-2">${document.getElementById('simMethod').value}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">服务:</span>
+                            <span class="ml-2 font-mono">${document.getElementById('simService').value}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">模拟QPS:</span>
+                            <span class="ml-2 font-bold ${parseFloat(document.getElementById('simQPS').value) > 1000 ? 'text-red-400' : 'text-green-400'}">${document.getElementById('simQPS').value}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        refreshSamplingStats();
+        loadTraceList();
+    </script>
+</body>
+</html>
