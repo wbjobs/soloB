@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预测性查询诊断</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        body { padding-top: 20px; background-color: #f8f9fa; }
+        .card { margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card-header { background-color: #4a6fa5; color: white; font-weight: bold; }
+        .metric-card { text-align: center; padding: 20px; }
+        .metric-value { font-size: 2.5rem; font-weight: bold; }
+        .metric-label { color: #666; }
+        .severity-critical { background-color: #dc3545; color: white; }
+        .severity-warning { background-color: #ffc107; color: #333; }
+        .severity-info { background-color: #17a2b8; color: white; }
+        .status-active { background-color: #dc3545; color: white; }
+        .status-acknowledged { background-color: #ffc107; color: #333; }
+        .status-resolved { background-color: #28a745; color: white; }
+        .table-responsive { max-height: 500px; overflow-y: auto; }
+        #queryChart { height: 300px; }
+        .sql-preview {
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .nav-tabs .nav-link.active { background-color: #4a6fa5; color: white; }
+        .badge { margin-right: 5px; }
+        .loading-spinner {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="mb-4">
+            <h1 class="text-center mb-3">预测性查询诊断</h1>
+            <p class="text-center text-muted">基于Prophet的SQL性能预测与智能优化建议系统</p>
+        </header>
+
+        <!-- 导航标签 -->
+        <ul class="nav nav-tabs mb-4" id="mainTabs">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#dashboard">仪表盘</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#queries">查询分析</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#models">模型管理</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#alerts">告警中心</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tools">SQL分析工具</a>
+            </li>
+        </ul>
+
+        <!-- 标签内容 -->
+        <div class="tab-content">
+            <!-- 仪表盘标签 -->
+            <div class="tab-pane fade show active" id="dashboard">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-primary" id="totalQueries">-</div>
+                            <div class="metric-label">查询模式数</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-success" id="trainedModels">-</div>
+                            <div class="metric-label">已训练模型</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-warning" id="activeAlerts">-</div>
+                            <div class="metric-label">活动告警</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card">
+                            <div class="metric-value text-danger" id="criticalAlerts">-</div>
+                            <div class="metric-label">严重告警</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header">Top 异常查询预测</div>
+                            <div class="card-body">
+                                <canvas id="anomalyChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">快速操作</div>
+                            <div class="card-body">
+                                <button class="btn btn-primary w-100 mb-2" onclick="runBatchPrediction()">
+                                    运行批量预测
+                                </button>
+                                <button class="btn btn-success w-100 mb-2" onclick="refreshDashboard()">
+                                    刷新数据
+                                </button>
+                                <button class="btn btn-info w-100 mb-2" onclick="generateSampleData()">
+                                    生成测试数据
+                                </button>
+                                <button class="btn btn-warning w-100" onclick="trainAllModels()">
+                                    训练所有模型
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">最新告警</div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="recentAlertsTable">
+                                <thead>
+                                    <tr>
+                                        <th>级别</th>
+                                        <th>标题</th>
+                                        <th>查询哈希</th>
+                                        <th>状态</th>
+                                        <th>时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 查询分析标签 -->
+            <div class="tab-pane fade" id="queries">
+                <div class="card">
+                    <div class="card-header">查询列表</div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="queriesTable">
+                                <thead>
+                                    <tr>
+                                        <th>查询哈希</th>
+                                        <th>SQL预览</th>
+                                        <th>数据点</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="queryDetailCard" style="display: none;">
+                    <div class="card-header">查询详情 <span id="detailQueryHash"></span></div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <h6>完整SQL:</h6>
+                                <pre class="sql-preview" id="detailSql"></pre>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <canvas id="queryChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button class="btn btn-primary" onclick="trainSelectedModel()">训练模型</button>
+                                <button class="btn btn-success" onclick="runPrediction()">运行预测</button>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button class="btn btn-outline-secondary" onclick="hideQueryDetail()">关闭</button>
+                            </div>
+                        </div>
+                        <div id="predictionResult" class="mt-3" style="display: none;">
+                            <h6>预测结果:</h6>
+                            <pre id="predictionOutput"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模型管理标签 -->
+            <div class="tab-pane fade" id="models">
+                <div class="card">
+                    <div class="card-header">已训练模型列表</div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="modelsTable">
+                                <thead>
+                                    <tr>
+                                        <th>查询哈希</th>
+                                        <th>状态</th>
+                                        <th>数据点</th>
+                                        <th>MAPE</th>
+                                        <th>RMSE</th>
+                                        <th>训练时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 告警中心标签 -->
+            <div class="tab-pane fade" id="alerts">
+                <div class="card">
+                    <div class="card-header">
+                        告警列表
+                        <div class="float-end">
+                            <button class="btn btn-sm btn-outline-light" onclick="refreshAlerts()">刷新</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <select class="form-select" id="filterSeverity" onchange="refreshAlerts()">
+                                    <option value="">所有级别</option>
+                                    <option value="critical">严重</option>
+                                    <option value="warning">警告</option>
+                                    <option value="info">信息</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <select class="form-select" id="filterStatus" onchange="refreshAlerts()">
+                                    <option value="">所有状态</option>
+                                    <option value="active">活动</option>
+                                    <option value="acknowledged">已确认</option>
+                                    <option value="resolved">已解决</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="alertsTable">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>级别</th>
+                                        <th>标题</th>
+                                        <th>查询哈希</th>
+                                        <th>状态</th>
+                                        <th>时间</th>
+                                        <th>操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">告警渠道配置</div>
+                    <div class="card-body">
+                        <form id="alertConfigForm">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">告警类型</label>
+                                    <select class="form-select" id="alertType">
+                                        <option value="*">所有类型</option>
+                                        <option value="predicted_slowdown">预测性能下降</option>
+                                        <option value="performance_anomaly">性能异常</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">渠道类型</label>
+                                    <select class="form-select" id="channelType">
+                                        <option value="email">邮件</option>
+                                        <option value="webhook">Webhook</option>
+                                        <option value="slack">Slack</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="emailConfig" class="config-section">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">SMTP服务器</label>
+                                        <input type="text" class="form-control" id="smtpHost" placeholder="smtp.example.com">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">端口</label>
+                                        <input type="number" class="form-control" id="smtpPort" value="587">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">用户名</label>
+                                        <input type="text" class="form-control" id="smtpUsername">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">密码</label>
+                                        <input type="password" class="form-control" id="smtpPassword">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label">收件人（逗号分隔）</label>
+                                        <input type="text" class="form-control" id="recipients" placeholder="admin@example.com">
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="webhookConfig" class="config-section" style="display: none;">
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label">Webhook URL</label>
+                                        <input type="text" class="form-control" id="webhookUrl" placeholder="https://example.com/webhook">
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="slackConfig" class="config-section" style="display: none;">
+                                <div class="row mb-3">
+                                    <div class="col-md-10">
+                                        <label class="form-label">Slack Webhook URL</label>
+                                        <input type="text" class="form-control" id="slackWebhookUrl">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label">频道</label>
+                                        <input type="text" class="form-control" id="slackChannel" placeholder="#alerts">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="saveAlertConfig()">保存配置</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SQL分析工具标签 -->
+            <div class="tab-pane fade" id="tools">
+                <div class="card">
+                    <div class="card-header">SQL分析与索引推荐</div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label">输入SQL语句</label>
+                                <textarea class="form-control" id="sqlInput" rows="5" placeholder="SELECT * FROM table WHERE column = ?"></textarea>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <button class="btn btn-primary" onclick="analyzeSql()">分析SQL</button>
+                                <button class="btn btn-success" onclick="recommendIndex()">推荐索引</button>
+                                <button class="btn btn-outline-secondary" onclick="clearAnalysis()">清除</button>
+                            </div>
+                        </div>
+
+                        <div id="analysisResult" style="display: none;">
+                            <h6>SQL分析结果:</h6>
+                            <pre id="analysisOutput"></pre>
+                        </div>
+
+                        <div id="indexResult" style="display: none;">
+                            <h6>索引推荐:</h6>
+                            <div id="indexRecommendations"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-spinner" id="loadingSpinner">
+        <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 自动检测API基础路径
+        const API_BASE = window.location.protocol + "//" + window.location.host + "/api/v1";
+        let selectedQueryHash = null;
+        let queryChart = null;
+        let anomalyChart = null;
+
+        function showLoading() {
+            document.getElementById('loadingSpinner').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingSpinner').style.display = 'none';
+        }
+
+        async function fetchApi(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, {
+                    headers: { 'Content-Type': 'application/json', ...options.headers },
+                    ...options
+                });
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'API请求失败');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                alert(error.message);
+                throw error;
+            }
+        }
+
+        async function refreshDashboard() {
+            showLoading();
+            try {
+                const stats = await fetchApi('/dashboard/stats');
+                document.getElementById('totalQueries').textContent = stats.total_queries;
+                document.getElementById('trainedModels').textContent = stats.trained_models;
+                document.getElementById('activeAlerts').textContent = stats.active_alerts;
+                document.getElementById('criticalAlerts').textContent = stats.critical_alerts;
+
+                const alerts = await fetchApi('/alerts?limit=5');
+                updateRecentAlertsTable(alerts.alerts);
+
+                try {
+                    const anomalies = await fetchApi('/dashboard/top-anomalies');
+                    updateAnomalyChart(anomalies.anomalies);
+                } catch (e) {
+                    console.log('No anomalies data yet');
+                }
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function updateRecentAlertsTable(alerts) {
+            const tbody = document.querySelector('#recentAlertsTable tbody');
+            tbody.innerHTML = alerts.map(alert => `
+                <tr>
+                    <td><span class="badge severity-${alert.severity}">${alert.severity}</span></td>
+                    <td>${alert.title}</td>
+                    <td><code>${alert.query_hash ? alert.query_hash.substring(0, 12) + '...' : '-'}</code></td>
+                    <td><span class="badge status-${alert.status}">${alert.status}</span></td>
+                    <td>${new Date(alert.created_at).toLocaleString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="acknowledgeAlert('${alert.alert_id}')">确认</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateAnomalyChart(anomalies) {
+            const ctx = document.getElementById('anomalyChart').getContext('2d');
+            if (anomalyChart) anomalyChart.destroy();
+
+            const labels = anomalies.map((_, i) => `Query ${i + 1}`);
+            const scores = anomalies.map(a => a.anomaly_score || 0);
+
+            anomalyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '异常分数',
+                        data: scores,
+                        backgroundColor: scores.map(s => s > 2 ? 'rgba(220, 53, 69, 0.7)' : 'rgba(255, 193, 7, 0.7)'),
+                        borderColor: scores.map(s => s > 2 ? 'rgba(220, 53, 69, 1)' : 'rgba(255, 193, 7, 1)'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true, title: { display: true, text: '异常分数' } } }
+                }
+            });
+        }
+
+        async function refreshQueries() {
+            showLoading();
+            try {
+                const data = await fetchApi('/metrics/queries');
+                const tbody = document.querySelector('#queriesTable tbody');
+                tbody.innerHTML = data.queries.map(q => `
+                    <tr>
+                        <td><code>${q.query_hash}</code></td>
+                        <td><div class="sql-preview">${q.sql_pattern || '-'}</div></td>
+                        <td>${q.count || '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showQueryDetail('${q.query_hash}')">查看详情</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function showQueryDetail(queryHash) {
+            selectedQueryHash = queryHash;
+            document.getElementById('detailQueryHash').textContent = queryHash;
+            document.getElementById('queryDetailCard').style.display = 'block';
+
+            showLoading();
+            try {
+                const data = await fetchApi(`/metrics/${queryHash}?hours=24`);
+                document.getElementById('detailSql').textContent = data.metrics[0]?.sql || '-';
+
+                const ctx = document.getElementById('queryChart').getContext('2d');
+                if (queryChart) queryChart.destroy();
+
+                const labels = data.metrics.map(m => new Date(m.timestamp).toLocaleTimeString());
+                const durations = data.metrics.map(m => m.duration_ms);
+
+                queryChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: '执行时间 (ms)',
+                            data: durations,
+                            borderColor: 'rgba(74, 111, 165, 1)',
+                            backgroundColor: 'rgba(74, 111, 165, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { beginAtZero: true, title: { display: true, text: '执行时间 (ms)' } } }
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function hideQueryDetail() {
+            document.getElementById('queryDetailCard').style.display = 'none';
+            selectedQueryHash = null;
+        }
+
+        async function trainSelectedModel() {
+            if (!selectedQueryHash) return;
+            showLoading();
+            try {
+                await fetchApi(`/models/train/${selectedQueryHash}`, { method: 'POST' });
+                alert('模型训练成功！');
+                refreshModels();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function runPrediction() {
+            if (!selectedQueryHash) return;
+            showLoading();
+            try {
+                const result = await fetchApi('/predict', {
+                    method: 'POST',
+                    body: JSON.stringify({ query_hash: selectedQueryHash, horizon_minutes: 30 })
+                });
+                document.getElementById('predictionResult').style.display = 'block';
+                document.getElementById('predictionOutput').textContent = JSON.stringify(result.prediction, null, 2);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function refreshModels() {
+            showLoading();
+            try {
+                const data = await fetchApi('/models');
+                const tbody = document.querySelector('#modelsTable tbody');
+                tbody.innerHTML = data.models.map(m => `
+                    <tr>
+                        <td><code>${m.query_hash}</code></td>
+                        <td><span class="badge ${m.status === 'trained' ? 'bg-success' : 'bg-secondary'}">${m.status}</span></td>
+                        <td>${m.data_points || '-'}</td>
+                        <td>${m.mape ? m.mape.toFixed(2) + '%' : '-'}</td>
+                        <td>${m.rmse ? m.rmse.toFixed(2) : '-'}</td>
+                        <td>${m.trained_at ? new Date(m.trained_at).toLocaleString() : '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteModel('${m.query_hash}')">删除</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function deleteModel(queryHash) {
+            if (!confirm('确定删除此模型？')) return;
+            showLoading();
+            try {
+                await fetchApi(`/models/${queryHash}`, { method: 'DELETE' });
+                refreshModels();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function refreshAlerts() {
+            const severity = document.getElementById('filterSeverity').value;
+            const status = document.getElementById('filterStatus').value;
+            let url = '/alerts?limit=100';
+            if (severity) url += `&severity=${severity}`;
+            if (status) url += `&status=${status}`;
+
+            showLoading();
+            try {
+                const data = await fetchApi(url);
+                const tbody = document.querySelector('#alertsTable tbody');
+                tbody.innerHTML = data.alerts.map(alert => `
+                    <tr>
+                        <td><small>${alert.alert_id}</small></td>
+                        <td><span class="badge severity-${alert.severity}">${alert.severity}</span></td>
+                        <td>${alert.title}</td>
+                        <td><code>${alert.query_hash ? alert.query_hash.substring(0, 12) + '...' : '-'}</code></td>
+                        <td><span class="badge status-${alert.status}">${alert.status}</span></td>
+                        <td>${new Date(alert.created_at).toLocaleString()}</td>
+                        <td>
+                            ${alert.status === 'active' ? `
+                                <button class="btn btn-sm btn-outline-primary" onclick="acknowledgeAlert('${alert.alert_id}')">确认</button>
+                            ` : ''}
+                            ${alert.status !== 'resolved' ? `
+                                <button class="btn btn-sm btn-outline-success" onclick="resolveAlert('${alert.alert_id}')">解决</button>
+                            ` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function acknowledgeAlert(alertId) {
+            showLoading();
+            try {
+                await fetchApi('/alerts/acknowledge', {
+                    method: 'POST',
+                    body: JSON.stringify({ alert_id: alertId })
+                });
+                refreshAlerts();
+                refreshDashboard();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function resolveAlert(alertId) {
+            showLoading();
+            try {
+                await fetchApi('/alerts/resolve', {
+                    method: 'POST',
+                    body: JSON.stringify({ alert_id: alertId })
+                });
+                refreshAlerts();
+                refreshDashboard();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function saveAlertConfig() {
+            const alertType = document.getElementById('alertType').value;
+            const channelType = document.getElementById('channelType').value;
+            let config = {};
+
+            if (channelType === 'email') {
+                config = {
+                    smtp_host: document.getElementById('smtpHost').value,
+                    smtp_port: parseInt(document.getElementById('smtpPort').value),
+                    smtp_username: document.getElementById('smtpUsername').value,
+                    smtp_password: document.getElementById('smtpPassword').value,
+                    recipients: document.getElementById('recipients').value.split(',').map(r => r.trim())
+                };
+            } else if (channelType === 'webhook') {
+                config = { webhook_url: document.getElementById('webhookUrl').value };
+            } else if (channelType === 'slack') {
+                config = {
+                    webhook_url: document.getElementById('slackWebhookUrl').value,
+                    channel: document.getElementById('slackChannel').value
+                };
+            }
+
+            showLoading();
+            try {
+                await fetchApi('/alerts/config', {
+                    method: 'POST',
+                    body: JSON.stringify({ alert_type: alertType, channel_type: channelType, config })
+                });
+                alert('告警渠道配置成功！');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function analyzeSql() {
+            const sql = document.getElementById('sqlInput').value;
+            if (!sql.trim()) {
+                alert('请输入SQL语句');
+                return;
+            }
+
+            showLoading();
+            try {
+                const result = await fetchApi('/sql/analyze', {
+                    method: 'POST',
+                    body: JSON.stringify({ sql })
+                });
+                document.getElementById('analysisResult').style.display = 'block';
+                document.getElementById('analysisOutput').textContent = JSON.stringify(result, null, 2);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function recommendIndex() {
+            const sql = document.getElementById('sqlInput').value;
+            if (!sql.trim()) {
+                alert('请输入SQL语句');
+                return;
+            }
+
+            showLoading();
+            try {
+                const result = await fetchApi('/index/recommend', {
+                    method: 'POST',
+                    body: JSON.stringify({ sql })
+                });
+                document.getElementById('indexResult').style.display = 'block';
+
+                let html = `<p>共 ${result.summary.total_recommendations} 条推荐，平均预期提升 ${result.summary.average_estimated_improvement_pct}%</p>`;
+                html += '<div class="list-group">';
+
+                result.recommendations.forEach(rec => {
+                    html += `
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${rec.index_name} <span class="badge bg-${rec.priority === 'high' ? 'danger' : rec.priority === 'medium' ? 'warning' : 'info'}">${rec.priority}</span></h6>
+                                <small>风险: ${rec.risk_level} | 置信度: ${(rec.confidence * 100).toFixed(0)}%</small>
+                            </div>
+                            <p class="mb-1"><strong>预期改进:</strong> ${rec.estimated_improvement_pct.toFixed(1)}%</p>
+                            <p class="mb-1"><strong>创建语句:</strong> <code>${rec.create_statement}</code></p>
+                            <small class="text-muted">${rec.reason}</small>
+                        </div>
+                    `;
+                });
+
+                html += '</div>';
+                html += '<h6 class="mt-3">优化行动建议:</h6><ul>';
+                result.action_items.forEach(action => {
+                    html += `<li><strong>${action.action}</strong>: <code>${action.sql}</code> (${action.expected_benefit}, ${action.confidence})</li>`;
+                });
+                html += '</ul>';
+
+                document.getElementById('indexRecommendations').innerHTML = html;
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function clearAnalysis() {
+            document.getElementById('sqlInput').value = '';
+            document.getElementById('analysisResult').style.display = 'none';
+            document.getElementById('indexResult').style.display = 'none';
+        }
+
+        async function runBatchPrediction() {
+            showLoading();
+            try {
+                const result = await fetchApi('/predict/batch', { method: 'POST' });
+                alert(`批量预测完成！\n总预测数: ${result.total_predictions}\n检测到异常: ${result.anomalies_detected}`);
+                refreshDashboard();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function generateSampleData() {
+            showLoading();
+            try {
+                alert('测试数据生成功能需要在后端实现');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function trainAllModels() {
+            if (!confirm('确定要训练所有模型吗？这可能需要一些时间。')) return;
+            showLoading();
+            try {
+                const queries = await fetchApi('/metrics/queries');
+                for (const q of queries.queries) {
+                    try {
+                        await fetchApi(`/models/train/${q.query_hash}`, { method: 'POST' });
+                    } catch (e) {
+                        console.log(`模型训练跳过: ${q.query_hash}`, e.message);
+                    }
+                }
+                alert('模型训练完成！');
+                refreshModels();
+            } finally {
+                hideLoading();
+            }
+        }
+
+        document.getElementById('channelType').addEventListener('change', function() {
+            document.querySelectorAll('.config-section').forEach(el => el.style.display = 'none');
+            document.getElementById(this.value + 'Config').style.display = 'block';
+        });
+
+        document.getElementById('mainTabs').addEventListener('shown.bs.tab', function(e) {
+            const target = e.target.getAttribute('href');
+            if (target === '#dashboard') refreshDashboard();
+            if (target === '#queries') refreshQueries();
+            if (target === '#models') refreshModels();
+            if (target === '#alerts') refreshAlerts();
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshDashboard();
+        });
+    </script>
+</body>
+</html>
