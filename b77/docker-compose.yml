@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: raytracer-postgres
+    environment:
+      POSTGRES_USER: raytracer
+      POSTGRES_PASSWORD: raytracer123
+      POSTGRES_DB: raytracer
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - raytracer-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raytracer"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: raytracer-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://raytracer:raytracer123@postgres:5432/raytracer
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - raytracer-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: raytracer-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - raytracer-network
+
+volumes:
+  postgres_data:
+
+networks:
+  raytracer-network:
+    driver: bridge
