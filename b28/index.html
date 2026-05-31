@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGPU Mandelbrot 集合 - 高精度版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.9/dat.gui.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .controls {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            cursor: grab;
+        }
+
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info {
+            position: absolute;
+            bottom: 16px;
+            left: 16px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .info div {
+            margin: 4px 0;
+        }
+
+        #error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ff4757;
+            color: white;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            max-width: 400px;
+            z-index: 1000;
+        }
+
+        #error-message h2 {
+            margin-bottom: 12px;
+        }
+
+        .dg .main {
+            max-height: 90vh !important;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <h1>Mandelbrot 集合 - WebGPU 高精度渲染</h1>
+            <div class="controls">
+                使用鼠标拖拽平移 | 使用滚轮缩放 | 支持深度缩放（双单精度技术）| 右上角可调整颜色方案
+            </div>
+        </div>
+        <div id="canvas-container">
+            <canvas id="mandelbrot-canvas"></canvas>
+            <div class="info">
+                <div>中心坐标: <span id="center">-0.5, 0.0</span></div>
+                <div>缩放级别: <span id="zoom">1.0</span></div>
+                <div>最大迭代: <span id="maxIterations">500</span></div>
+                <div>精度模式: <span id="precisionMode">标准 (f32)</span></div>
+                <div>颜色方案: <span id="colorScheme">经典蓝</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/wgsl" id="computeShader">
+        struct DoubleFloat {
+            high: f32,
+            low: f32,
+        }
+
+        struct Params {
+            centerXHigh: f32,
+            centerXLow: f32,
+            centerYHigh: f32,
+            centerYLow: f32,
+            scaleHigh: f32,
+            scaleLow: f32,
+            aspect: f32,
+            useHighPrecision: u32,
+            width: u32,
+            height: u32,
+            maxIterations: u32,
+            numColorStops: u32,
+        }
+
+        struct ColorStop {
+            r: f32,
+            g: f32,
+            b: f32,
+            position: f32,
+        }
+
+        @group(0) @binding(0) var<uniform> params: Params;
+        @group(0) @binding(1) var<storage, read_write> output: texture_storage_2d<rgba8unorm>;
+        @group(0) @binding(2) var<uniform> colorStops: array<ColorStop, 10>;
+
+        fn dfAdd(a: DoubleFloat, b: DoubleFloat) -> DoubleFloat {
+            var t: f32;
+            var result: DoubleFloat;
+            
+            result.high = a.high + b.high;
+            t = result.high - a.high;
+            result.low = a.low + (b.high - t) + (b.low);
+            
+            if (abs(result.low) >= abs(result.high) * 1e-7) {
+                t = result.high + result.low;
+                result.low = result.low - (t - result.high);
+                result.high = t;
+            }
+            
+            return result;
+        }
+
+        fn dfSub(a: DoubleFloat, b: DoubleFloat) -> DoubleFloat {
+            var negB: DoubleFloat;
+            negB.high = -b.high;
+            negB.low = -b.low;
+            return dfAdd(a, negB);
+        }
+
+        fn dfMul(a: DoubleFloat, b: DoubleFloat) -> DoubleFloat {
+            var result: DoubleFloat;
+            var a1: f32;
+            var a2: f32;
+            var b1: f32;
+            var b2: f32;
+            var cona: f32;
+            var conb: f32;
+            var c11: f32;
+            var c21: f32;
+            var c: f32;
+            var t: f32;
+            var e: f32;
+            var f: f32;
+
+            cona = a.high * 134217729.0;
+            a1 = a.high - cona + cona;
+            a2 = a.high - a1;
+            
+            conb = b.high * 134217729.0;
+            b1 = b.high - conb + conb;
+            b2 = b.high - b1;
+
+            c11 = a.high * b.high;
+            c21 = a2 * b2 + (a1 * b2 + a2 * b1);
+
+            c = c11 + c21;
+            e = c - c11;
+            f = c21 - e;
+
+            result.high = c;
+            result.low = a.low * b.high + a.high * b.low + f;
+
+            t = result.high + result.low;
+            result.low = result.low - (t - result.high);
+            result.high = t;
+
+            return result;
+        }
+
+        fn dfSqr(a: DoubleFloat) -> DoubleFloat {
+            return dfMul(a, a);
+        }
+
+        fn dfFromF32(a: f32) -> DoubleFloat {
+            var result: DoubleFloat;
+            result.high = a;
+            result.low = 0.0;
+            return result;
+        }
+
+        fn dfToF32(a: DoubleFloat) -> f32 {
+            return a.high + a.low;
+        }
+
+        fn lerp(a: vec3<f32>, b: vec3<f32>, t: f32) -> vec3<f32> {
+            return a + (b - a) * t;
+        }
+
+        fn sampleGradient(t: f32, numStops: u32) -> vec3<f32> {
+            if (numStops <= 1u) {
+                return vec3<f32>(colorStops[0].r, colorStops[0].g, colorStops[0].b);
+            }
+
+            var lowerIndex: u32 = 0u;
+            var upperIndex: u32 = 1u;
+            
+            for (var i: u32 = 0u; i < numStops - 1u; i = i + 1u) {
+                if (t >= colorStops[i].position && t <= colorStops[i + 1u].position) {
+                    lowerIndex = i;
+                    upperIndex = i + 1u;
+                    break;
+                }
+            }
+
+            let lowerStop: ColorStop = colorStops[lowerIndex];
+            let upperStop: ColorStop = colorStops[upperIndex];
+            
+            let range: f32 = upperStop.position - lowerStop.position;
+            let localT: f32 = range > 0.0 ? (t - lowerStop.position) / range : 0.0;
+
+            let lowerColor: vec3<f32> = vec3<f32>(lowerStop.r, lowerStop.g, lowerStop.b);
+            let upperColor: vec3<f32> = vec3<f32>(upperStop.r, upperStop.g, upperStop.b);
+
+            return lerp(lowerColor, upperColor, localT);
+        }
+
+        fn getColor(iteration: f32, maxIter: f32) -> vec4<f32> {
+            if (iteration == maxIter) {
+                return vec4<f32>(0.0, 0.0, 0.0, 1.0);
+            }
+
+            let t: f32 = iteration / maxIter;
+            let color: vec3<f32> = sampleGradient(t, params.numColorStops);
+
+            return vec4<f32>(color, 1.0);
+        }
+
+        @compute @workgroup_size(16, 16)
+        fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
+            let x: u32 = global_id.x;
+            let y: u32 = global_id.y;
+
+            if (x >= params.width || y >= params.height) {
+                return;
+            }
+
+            var cReal: f32;
+            var cImag: f32;
+            var zReal: f32;
+            var zImag: f32;
+            var zRealDf: DoubleFloat;
+            var zImagDf: DoubleFloat;
+            var cRealDf: DoubleFloat;
+            var cImagDf: DoubleFloat;
+            var iteration: u32 = 0;
+            var smoothIteration: f32 = 0.0;
+
+            if (params.useHighPrecision == 1u) {
+                var centerXDf: DoubleFloat;
+                centerXDf.high = params.centerXHigh;
+                centerXDf.low = params.centerXLow;
+                
+                var centerYDf: DoubleFloat;
+                centerYDf.high = params.centerYHigh;
+                centerYDf.low = params.centerYLow;
+                
+                var scaleDf: DoubleFloat;
+                scaleDf.high = params.scaleHigh;
+                scaleDf.low = params.scaleLow;
+                
+                let fourDf: DoubleFloat = dfFromF32(4.0);
+                let invScaleDf: DoubleFloat = dfDiv(fourDf, scaleDf);
+                
+                let realOffset: f32 = f32(x) / f32(params.width) - 0.5;
+                let imagOffset: f32 = f32(y) / f32(params.height) - 0.5;
+                
+                let realOffsetDf: DoubleFloat = dfFromF32(realOffset);
+                let imagOffsetDf: DoubleFloat = dfFromF32(imagOffset);
+                let aspectDf: DoubleFloat = dfFromF32(params.aspect);
+                
+                var temp: DoubleFloat = dfMul(realOffsetDf, invScaleDf);
+                temp = dfMul(temp, aspectDf);
+                cRealDf = dfAdd(centerXDf, temp);
+                
+                temp = dfMul(imagOffsetDf, invScaleDf);
+                cImagDf = dfAdd(centerYDf, temp);
+                
+                zRealDf = dfFromF32(0.0);
+                zImagDf = dfFromF32(0.0);
+
+                while (iteration < params.maxIterations) {
+                    let zReal2Df: DoubleFloat = dfSqr(zRealDf);
+                    let zImag2Df: DoubleFloat = dfSqr(zImagDf);
+                    
+                    let zReal2: f32 = dfToF32(zReal2Df);
+                    let zImag2: f32 = dfToF32(zImag2Df);
+                    
+                    if (zReal2 + zImag2 > 4.0) {
+                        break;
+                    }
+                    
+                    var tempDf: DoubleFloat = dfMul(zRealDf, zImagDf);
+                    var twoDf: DoubleFloat = dfFromF32(2.0);
+                    
+                    var newZRealDf: DoubleFloat = dfSub(zReal2Df, zImag2Df);
+                    newZRealDf = dfAdd(newZRealDf, cRealDf);
+                    
+                    var newZImagDf: DoubleFloat = dfMul(twoDf, tempDf);
+                    newZImagDf = dfAdd(newZImagDf, cImagDf);
+                    
+                    zRealDf = newZRealDf;
+                    zImagDf = newZImagDf;
+                    
+                    iteration = iteration + 1;
+                }
+                
+                zReal = dfToF32(zRealDf);
+                zImag = dfToF32(zImagDf);
+            } else {
+                let scale: f32 = 4.0 / params.scaleHigh;
+                
+                let real: f32 = f32(x) / f32(params.width) - 0.5;
+                let imag: f32 = f32(y) / f32(params.height) - 0.5;
+                
+                cReal = params.centerXHigh + real * scale * params.aspect;
+                cImag = params.centerYHigh + imag * scale;
+                
+                zReal = 0.0;
+                zImag = 0.0;
+
+                while (iteration < params.maxIterations) {
+                    let zReal2: f32 = zReal * zReal;
+                    let zImag2: f32 = zImag * zImag;
+
+                    if (zReal2 + zImag2 > 4.0) {
+                        break;
+                    }
+
+                    let temp: f32 = zReal * zImag;
+                    zReal = zReal2 - zImag2 + cReal;
+                    zImag = 2.0 * temp + cImag;
+                    iteration = iteration + 1;
+                }
+            }
+
+            smoothIteration = f32(iteration);
+
+            if (iteration < params.maxIterations) {
+                let logZn: f32 = log(zReal * zReal + zImag * zImag) / 2.0;
+                let logLogZn: f32 = log(logZn);
+                smoothIteration = f32(iteration) + 1.0 - logLogZn / log(2.0);
+            }
+
+            let color: vec4<f32> = getColor(smoothIteration, f32(params.maxIterations));
+            textureStore(output, vec2<i32>(i32(x), i32(y)), color);
+        }
+
+        fn dfDiv(a: DoubleFloat, b: DoubleFloat) -> DoubleFloat {
+            var x1: f32;
+            var x2: f32;
+            var con: f32;
+            var y1: f32;
+            var y2: f32;
+            var u: f32;
+            var t1: f32;
+            var t2: f32;
+            var e: f32;
+            var result: DoubleFloat;
+
+            x1 = 1.0 / b.high;
+            x2 = a.high * x1;
+            
+            con = a.high * 134217729.0;
+            y1 = a.high - con + con;
+            y2 = a.high - y1;
+            
+            con = b.high * 134217729.0;
+            u = b.high - con + con;
+            y2 = y2 + (a.high - x2 * u - x2 * (b.high - u)) + a.low;
+            x1 = (x2 + y2 * x1) / b.high;
+            
+            t1 = x1 * b.high;
+            t2 = x1 * b.low;
+            e = (x2 - t1) + (y2 - t2);
+            u = e / b.high;
+            
+            result.high = x1 + u;
+            result.low = u - (result.high - x1);
+
+            return result;
+        }
+    </script>
+
+    <script type="text/wgsl" id="renderShader">
+        struct Params {
+            centerXHigh: f32,
+            centerXLow: f32,
+            centerYHigh: f32,
+            centerYLow: f32,
+            scaleHigh: f32,
+            scaleLow: f32,
+            aspect: f32,
+            useHighPrecision: u32,
+            width: u32,
+            height: u32,
+            maxIterations: u32,
+            numColorStops: u32,
+        }
+
+        @group(0) @binding(0) var<uniform> params: Params;
+        @group(0) @binding(1) var inputTex: texture_2d<f32>;
+
+        @vertex
+        fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> @builtin(position) vec4<f32> {
+            var pos: vec2<f32>;
+            switch(vertexIndex) {
+                case 0: {
+                    pos = vec2<f32>(-1.0, -1.0);
+                }
+                case 1: {
+                    pos = vec2<f32>(1.0, -1.0);
+                }
+                case 2: {
+                    pos = vec2<f32>(-1.0, 1.0);
+                }
+                case 3: {
+                    pos = vec2<f32>(1.0, -1.0);
+                }
+                case 4: {
+                    pos = vec2<f32>(1.0, 1.0);
+                }
+                case 5: {
+                    pos = vec2<f32>(-1.0, 1.0);
+                }
+                default: {
+                    pos = vec2<f32>(0.0, 0.0);
+                }
+            }
+            return vec4<f32>(pos, 0.0, 1.0);
+        }
+
+        @fragment
+        fn fs_main(@builtin(position) fragCoord: vec4<f32>) -> @location(0) vec4<f32> {
+            return textureLoad(inputTex, vec2<i32>(i32(fragCoord.x), i32(fragCoord.y)), 0);
+        }
+    </script>
+
+    <script>
+        const canvas = document.getElementById('mandelbrot-canvas');
+        const centerSpan = document.getElementById('center');
+        const zoomSpan = document.getElementById('zoom');
+        const maxIterationsSpan = document.getElementById('maxIterations');
+        const precisionModeSpan = document.getElementById('precisionMode');
+        const colorSchemeSpan = document.getElementById('colorScheme');
+
+        let device = null;
+        let adapter = null;
+        let computePipeline = null;
+        let renderPipeline = null;
+        let uniformBuffer = null;
+        let colorStopsBuffer = null;
+        let computeBindGroup = null;
+        let renderBindGroup = null;
+        let outputTexture = null;
+        let outputTextureView = null;
+        let context = null;
+        let computeShaderModule = null;
+        let renderShaderModule = null;
+        let renderBindGroupLayout = null;
+        let computeBindGroupLayout = null;
+        let gui = null;
+
+        const colorPresets = {
+            '经典蓝': [
+                { color: '#00000d', position: 0.0 },
+                { color: '#1a4dcc', position: 0.25 },
+                { color: '#cc9933', position: 0.5 },
+                { color: '#ffffff', position: 0.75 },
+                { color: '#1a4dcc', position: 1.0 }
+            ],
+            '火焰': [
+                { color: '#000000', position: 0.0 },
+                { color: '#1a0000', position: 0.1 },
+                { color: '#cc2900', position: 0.3 },
+                { color: '#ff6600', position: 0.5 },
+                { color: '#ffcc00', position: 0.7 },
+                { color: '#ffffff', position: 0.85 },
+                { color: '#ffcc00', position: 1.0 }
+            ],
+            '海洋': [
+                { color: '#00001a', position: 0.0 },
+                { color: '#003366', position: 0.2 },
+                { color: '#0099cc', position: 0.4 },
+                { color: '#33cccc', position: 0.6 },
+                { color: '#66ffff', position: 0.8 },
+                { color: '#ffffff', position: 1.0 }
+            ],
+            '彩虹': [
+                { color: '#000000', position: 0.0 },
+                { color: '#ff0000', position: 0.17 },
+                { color: '#ffff00', position: 0.33 },
+                { color: '#00ff00', position: 0.5 },
+                { color: '#00ffff', position: 0.67 },
+                { color: '#0000ff', position: 0.83 },
+                { color: '#ff00ff', position: 1.0 }
+            ],
+            '复古': [
+                { color: '#0d0d0d', position: 0.0 },
+                { color: '#4a3728', position: 0.2 },
+                { color: '#8b6914', position: 0.4 },
+                { color: '#c9a227', position: 0.6 },
+                { color: '#f0e130', position: 0.8 },
+                { color: '#fff7bc', position: 1.0 }
+            ],
+            '霓虹': [
+                { color: '#000000', position: 0.0 },
+                { color: '#ff00ff', position: 0.25 },
+                { color: '#00ffff', position: 0.5 },
+                { color: '#ffff00', position: 0.75 },
+                { color: '#ff00ff', position: 1.0 }
+            ],
+            '森林': [
+                { color: '#051a05', position: 0.0 },
+                { color: '#1a4d1a', position: 0.2 },
+                { color: '#2d8a2d', position: 0.4 },
+                { color: '#4db84d', position: 0.6 },
+                { color: '#99cc99', position: 0.8 },
+                { color: '#e6ffe6', position: 1.0 }
+            ],
+            '紫罗兰': [
+                { color: '#0a001a', position: 0.0 },
+                { color: '#330066', position: 0.2 },
+                { color: '#6600cc', position: 0.4 },
+                { color: '#9933ff', position: 0.6 },
+                { color: '#cc99ff', position: 0.8 },
+                { color: '#ffffff', position: 1.0 }
+            ],
+            '日落': [
+                { color: '#00000d', position: 0.0 },
+                { color: '#1a0033', position: 0.15 },
+                { color: '#4d004d', position: 0.3 },
+                { color: '#cc3300', position: 0.5 },
+                { color: '#ff6600', position: 0.65 },
+                { color: '#ffcc00', position: 0.8 },
+                { color: '#ffffcc', position: 1.0 }
+            ],
+            '极光': [
+                { color: '#00001a', position: 0.0 },
+                { color: '#00004d', position: 0.15 },
+                { color: '#003366', position: 0.3 },
+                { color: '#009933', position: 0.5 },
+                { color: '#33ff99', position: 0.7 },
+                { color: '#99ffff', position: 0.85 },
+                { color: '#ffffff', position: 1.0 }
+            ]
+        };
+
+        let params = {
+            centerX: -0.5,
+            centerY: 0.0,
+            scale: 1.0,
+            aspect: 1.0,
+            width: 800,
+            height: 600,
+            maxIterations: 500,
+            useHighPrecision: 0
+        };
+
+        let colorSettings = {
+            preset: '经典蓝',
+            customColors: JSON.parse(JSON.stringify(colorPresets['经典蓝']))
+        };
+
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+
+        const HIGH_PRECISION_THRESHOLD = 1e10;
+        const MAX_SCALE = 1e28;
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16) / 255,
+                g: parseInt(result[2], 16) / 255,
+                b: parseInt(result[3], 16) / 255
+            } : { r: 0, g: 0, b: 0 };
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = Math.round(x * 255).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+        }
+
+        function doubleToFloatPair(value) {
+            const high = Math.fround(value);
+            const low = value - high;
+            return { high, low };
+        }
+
+        function getColorStops() {
+            return colorSettings.customColors;
+        }
+
+        function createColorStopsBuffer() {
+            if (colorStopsBuffer) {
+                colorStopsBuffer.destroy();
+            }
+
+            const colorStops = getColorStops();
+            const data = new ArrayBuffer(10 * 16);
+            const float32View = new Float32Array(data);
+
+            for (let i = 0; i < colorStops.length && i < 10; i++) {
+                const rgb = hexToRgb(colorStops[i].color);
+                float32View[i * 4] = rgb.r;
+                float32View[i * 4 + 1] = rgb.g;
+                float32View[i * 4 + 2] = rgb.b;
+                float32View[i * 4 + 3] = colorStops[i].position;
+            }
+
+            colorStopsBuffer = device.createBuffer({
+                size: 10 * 16,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+
+            device.queue.writeBuffer(colorStopsBuffer, 0, data);
+        }
+
+        function updateColorStopsBuffer() {
+            const colorStops = getColorStops();
+            const data = new ArrayBuffer(10 * 16);
+            const float32View = new Float32Array(data);
+
+            for (let i = 0; i < colorStops.length && i < 10; i++) {
+                const rgb = hexToRgb(colorStops[i].color);
+                float32View[i * 4] = rgb.r;
+                float32View[i * 4 + 1] = rgb.g;
+                float32View[i * 4 + 2] = rgb.b;
+                float32View[i * 4 + 3] = colorStops[i].position;
+            }
+
+            device.queue.writeBuffer(colorStopsBuffer, 0, data);
+        }
+
+        function applyColorPreset(presetName) {
+            colorSettings.customColors = JSON.parse(JSON.stringify(colorPresets[presetName]));
+            colorSchemeSpan.textContent = presetName;
+            rebuildColorGUI();
+        }
+
+        function rebuildColorGUI() {
+            if (!gui) return;
+
+            const colorFolder = gui.__folders['颜色设置'];
+            if (colorFolder) {
+                while (colorFolder.__controllers.length > 0) {
+                    colorFolder.remove(colorFolder.__controllers[0]);
+                }
+            }
+
+            colorSettings.customColors.forEach((stop, index) => {
+                const stopFolder = colorFolder.addFolder(`色标 ${index + 1}`);
+                stopFolder.addColor(stop, 'color').name('颜色').onChange(() => {
+                    updateColorStopsBuffer();
+                });
+                stopFolder.add(stop, 'position', 0.0, 1.0).name('位置').step(0.01).onChange(() => {
+                    updateColorStopsBuffer();
+                });
+            });
+        }
+
+        function setupGUI() {
+            if (gui) {
+                gui.destroy();
+            }
+
+            gui = new dat.GUI({ width: 320 });
+            gui.domElement.style.marginTop = '70px';
+
+            const navigationFolder = gui.addFolder('导航');
+            navigationFolder.add(params, 'centerX', -3, 1).name('中心 X').step(0.0001).listen();
+            navigationFolder.add(params, 'centerY', -1, 1).name('中心 Y').step(0.0001).listen();
+            navigationFolder.add(params, 'scale', 1, 1e28).name('缩放').step(10).listen().onFinishChange(updateUI);
+            navigationFolder.add(params, 'maxIterations', 50, 5000).name('最大迭代').step(50).listen();
+            navigationFolder.add({
+                reset: function() {
+                    params.centerX = -0.5;
+                    params.centerY = 0.0;
+                    params.scale = 1.0;
+                    params.maxIterations = 500;
+                    updateUI();
+                }
+            }, 'reset').name('重置视图');
+            navigationFolder.open();
+
+            const colorFolder = gui.addFolder('颜色设置');
+            colorFolder.add(colorSettings, 'preset', Object.keys(colorPresets))
+                .name('预设方案')
+                .onChange((value) => {
+                    applyColorPreset(value);
+                    updateColorStopsBuffer();
+                });
+            colorFolder.open();
+
+            rebuildColorGUI();
+
+            const advancedFolder = gui.addFolder('高级设置');
+            const precisionObj = { mode: params.scale > HIGH_PRECISION_THRESHOLD ? '自动' : '自动' };
+            advancedFolder.add(precisionObj, 'mode', ['自动']).name('精度模式').listen();
+            advancedFolder.add({ info: '缩放 > 1e10 自动切换到高精度' }, 'info').name('提示').listen();
+            advancedFolder.open();
+        }
+
+        async function initWebGPU() {
+            if (!navigator.gpu) {
+                showError('WebGPU 不可用！请使用支持 WebGPU 的浏览器。');
+                return false;
+            }
+
+            try {
+                adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) {
+                    showError('无法获取 GPU 适配器！');
+                    return false;
+                }
+
+                device = await adapter.requestDevice();
+                if (!device) {
+                    showError('无法获取 GPU 设备！');
+                    return false;
+                }
+
+                context = canvas.getContext('webgpu');
+                if (!context) {
+                    showError('无法获取 WebGPU 上下文！');
+                    return false;
+                }
+
+                const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+                context.configure({
+                    device,
+                    format: presentationFormat,
+                    alphaMode: 'premultiplied',
+                });
+
+                await setupCanvas();
+                createColorStopsBuffer();
+                await createPipelines();
+                setupGUI();
+                updateUI();
+
+                canvas.addEventListener('mousedown', onMouseDown);
+                canvas.addEventListener('mousemove', onMouseMove);
+                canvas.addEventListener('mouseup', onMouseUp);
+                canvas.addEventListener('mouseleave', onMouseUp);
+                canvas.addEventListener('wheel', onWheel, { passive: false });
+                window.addEventListener('resize', onResize);
+
+                render();
+
+                return true;
+            } catch (error) {
+                showError('初始化 WebGPU 时出错: ' + error.message);
+                console.error('WebGPU error:', error);
+                return false;
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.id = 'error-message';
+            errorDiv.innerHTML = `
+                <h2>错误</h2>
+                <p>${message}</p>
+            `;
+            document.body.appendChild(errorDiv);
+        }
+
+        function setupCanvas() {
+            const container = document.getElementById('canvas-container');
+            const dpr = window.devicePixelRatio || 1;
+
+            params.width = Math.floor(container.clientWidth * dpr);
+            params.height = Math.floor(container.clientHeight * dpr);
+            params.aspect = params.width / params.height;
+
+            canvas.width = params.width;
+            canvas.height = params.height;
+
+            if (outputTexture) {
+                outputTexture.destroy();
+            }
+
+            outputTexture = device.createTexture({
+                size: [params.width, params.height],
+                format: 'rgba8unorm',
+                usage: GPUTextureUsage.STORAGE_BINDING | GPUTextureUsage.TEXTURE_BINDING,
+            });
+
+            outputTextureView = outputTexture.createView();
+
+            if (uniformBuffer) {
+                uniformBuffer.destroy();
+            }
+
+            uniformBuffer = device.createBuffer({
+                size: 12 * 4,
+                usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            });
+
+            if (colorStopsBuffer) {
+                createBindGroups();
+            }
+        }
+
+        async function createPipelines() {
+            const computeShaderCode = document.getElementById('computeShader').textContent;
+            const renderShaderCode = document.getElementById('renderShader').textContent;
+
+            computeShaderModule = device.createShaderModule({
+                code: computeShaderCode,
+            });
+
+            renderShaderModule = device.createShaderModule({
+                code: renderShaderCode,
+            });
+
+            computeBindGroupLayout = device.createBindGroupLayout({
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: 'uniform' },
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.COMPUTE,
+                        storageTexture: {
+                            access: 'write-only',
+                            format: 'rgba8unorm',
+                        },
+                    },
+                    {
+                        binding: 2,
+                        visibility: GPUShaderStage.COMPUTE,
+                        buffer: { type: 'uniform' },
+                    },
+                ],
+            });
+
+            renderBindGroupLayout = device.createBindGroupLayout({
+                entries: [
+                    {
+                        binding: 0,
+                        visibility: GPUShaderStage.FRAGMENT,
+                        buffer: { type: 'uniform' },
+                    },
+                    {
+                        binding: 1,
+                        visibility: GPUShaderStage.FRAGMENT,
+                        texture: {
+                            sampleType: 'float',
+                            viewDimension: '2d',
+                        },
+                    },
+                ],
+            });
+
+            const computePipelineLayout = device.createPipelineLayout({
+                bindGroupLayouts: [computeBindGroupLayout],
+            });
+
+            const renderPipelineLayout = device.createPipelineLayout({
+                bindGroupLayouts: [renderBindGroupLayout],
+            });
+
+            computePipeline = device.createComputePipeline({
+                layout: computePipelineLayout,
+                compute: {
+                    module: computeShaderModule,
+                    entryPoint: 'main',
+                },
+            });
+
+            const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+
+            renderPipeline = device.createRenderPipeline({
+                layout: renderPipelineLayout,
+                vertex: {
+                    module: renderShaderModule,
+                    entryPoint: 'vs_main',
+                },
+                fragment: {
+                    module: renderShaderModule,
+                    entryPoint: 'fs_main',
+                    targets: [{
+                        format: presentationFormat,
+                    }],
+                },
+                primitive: {
+                    topology: 'triangle-list',
+                },
+            });
+        }
+
+        function createBindGroups() {
+            computeBindGroup = device.createBindGroup({
+                layout: computeBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: uniformBuffer,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        resource: outputTextureView,
+                    },
+                    {
+                        binding: 2,
+                        resource: {
+                            buffer: colorStopsBuffer,
+                        },
+                    },
+                ],
+            });
+
+            renderBindGroup = device.createBindGroup({
+                layout: renderBindGroupLayout,
+                entries: [
+                    {
+                        binding: 0,
+                        resource: {
+                            buffer: uniformBuffer,
+                        },
+                    },
+                    {
+                        binding: 1,
+                        resource: outputTextureView,
+                    },
+                ],
+            });
+        }
+
+        function updateUniformBuffer() {
+            const data = new ArrayBuffer(48);
+            const float32View = new Float32Array(data);
+            const uint32View = new Uint32Array(data);
+
+            const centerXPair = doubleToFloatPair(params.centerX);
+            const centerYPair = doubleToFloatPair(params.centerY);
+            const scalePair = doubleToFloatPair(params.scale);
+
+            params.useHighPrecision = params.scale > HIGH_PRECISION_THRESHOLD ? 1 : 0;
+            const numColorStops = Math.min(getColorStops().length, 10);
+
+            float32View[0] = centerXPair.high;
+            float32View[1] = centerXPair.low;
+            float32View[2] = centerYPair.high;
+            float32View[3] = centerYPair.low;
+            float32View[4] = scalePair.high;
+            float32View[5] = scalePair.low;
+            float32View[6] = params.aspect;
+            uint32View[7] = params.useHighPrecision;
+            uint32View[8] = params.width;
+            uint32View[9] = params.height;
+            uint32View[10] = params.maxIterations;
+            uint32View[11] = numColorStops;
+
+            device.queue.writeBuffer(uniformBuffer, 0, data);
+        }
+
+        function updateUI() {
+            centerSpan.textContent = `${params.centerX.toFixed(8)}, ${params.centerY.toFixed(8)}`;
+            zoomSpan.textContent = params.scale.toFixed(2);
+            maxIterationsSpan.textContent = params.maxIterations;
+            
+            if (params.useHighPrecision) {
+                precisionModeSpan.textContent = '高精度 (双单精度)';
+                precisionModeSpan.style.color = '#ffd700';
+            } else {
+                precisionModeSpan.textContent = '标准 (f32)';
+                precisionModeSpan.style.color = '#90ee90';
+            }
+        }
+
+        function onMouseDown(event) {
+            isDragging = true;
+            lastMouseX = event.clientX;
+            lastMouseY = event.clientY;
+        }
+
+        function onMouseMove(event) {
+            if (!isDragging) return;
+
+            const deltaX = event.clientX - lastMouseX;
+            const deltaY = event.clientY - lastMouseY;
+
+            lastMouseX = event.clientX;
+            lastMouseY = event.clientY;
+
+            const scale = 4.0 / params.scale;
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+
+            params.centerX -= (deltaX / width) * scale * params.aspect;
+            params.centerY -= (deltaY / height) * scale;
+
+            updateUI();
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+        }
+
+        function onWheel(event) {
+            event.preventDefault();
+
+            const delta = event.deltaY;
+            const zoomFactor = delta > 0 ? 0.9 : 1.1;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+
+            const normalizedX = (mouseX / rect.width) - 0.5;
+            const normalizedY = (mouseY / rect.height) - 0.5;
+
+            const scale = 4.0 / params.scale;
+
+            const worldX = params.centerX + normalizedX * scale * params.aspect;
+            const worldY = params.centerY + normalizedY * scale;
+
+            const newScale = Math.min(params.scale * zoomFactor, MAX_SCALE);
+            params.scale = newScale;
+
+            const newScaleValue = 4.0 / params.scale;
+
+            params.centerX = worldX - normalizedX * newScaleValue * params.aspect;
+            params.centerY = worldY - normalizedY * newScaleValue;
+
+            if (params.scale > 1e14) {
+                params.maxIterations = Math.min(5000, Math.floor(500 + Math.log2(params.scale) * 30));
+            } else {
+                params.maxIterations = 500;
+            }
+
+            updateUI();
+        }
+
+        function onResize() {
+            setupCanvas();
+        }
+
+        function render() {
+            updateUniformBuffer();
+
+            const commandEncoder = device.createCommandEncoder();
+
+            const computePass = commandEncoder.beginComputePass();
+            computePass.setPipeline(computePipeline);
+            computePass.setBindGroup(0, computeBindGroup);
+
+            const workgroupSizeX = 16;
+            const workgroupSizeY = 16;
+            const workgroupCountX = Math.ceil(params.width / workgroupSizeX);
+            const workgroupCountY = Math.ceil(params.height / workgroupSizeY);
+
+            computePass.dispatchWorkgroups(workgroupCountX, workgroupCountY);
+            computePass.end();
+
+            const currentTexture = context.getCurrentTexture();
+            const currentTextureView = currentTexture.createView();
+
+            const renderPassDescriptor = {
+                colorAttachments: [{
+                    view: currentTextureView,
+                    clearValue: { r: 0, g: 0, b: 0, a: 1 },
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                }],
+            };
+
+            const renderPass = commandEncoder.beginRenderPass(renderPassDescriptor);
+            renderPass.setPipeline(renderPipeline);
+            renderPass.setBindGroup(0, renderBindGroup);
+            renderPass.draw(6);
+            renderPass.end();
+
+            device.queue.submit([commandEncoder.finish()]);
+
+            requestAnimationFrame(render);
+        }
+
+        initWebGPU();
+    </script>
+</body>
+</html>
