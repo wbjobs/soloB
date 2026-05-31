@@ -1,0 +1,113 @@
+global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+server:
+  replicaCount: 2
+  image:
+    repository: lowcode/server
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3000
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+    CORS_ORIGIN: "*"
+  secrets:
+    JWT_SECRET:
+      name: lowcode-secrets
+      key: jwt-secret
+    DATABASE_URL:
+      name: lowcode-secrets
+      key: database-url
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+
+web:
+  replicaCount: 2
+  image:
+    repository: lowcode/web
+    tag: latest
+  service:
+    type: ClusterIP
+    port: 3001
+  env:
+    NODE_ENV: production
+    PORT: "3001"
+  secrets:
+    API_BASE_URL:
+      name: lowcode-secrets
+      key: api-base-url
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+
+postgresql:
+  enabled: true
+  auth:
+    username: lowcode
+    password: lowcode123
+    database: lowcode
+  primary:
+    persistence:
+      size: 20Gi
+  readReplicas:
+    replicaCount: 1
+
+redis:
+  enabled: true
+  auth:
+    password: redis123
+  master:
+    persistence:
+      size: 8Gi
+  replica:
+    replicaCount: 1
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: lowcode.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: server
+        - path: /
+          pathType: Prefix
+          serviceName: web
+  tls:
+    - secretName: lowcode-tls
+      hosts:
+        - lowcode.local
+
+secrets:
+  create: true
+  name: lowcode-secrets
+  data:
+    jwt-secret: eW91ci1zdXBlci1zZWNyZXQtanN3dC1rZXk=
+    database-url: cG9zdGdyZXNxbDovL2xvY29kZTpsb2Njb2RlMTIzQHBvc3RncmVzOjU0MzIvbG9jY29kZT9zY2hlbWE9cHVibGlj
+    api-base-url: aHR0cDovL3NlcnZlcjozMDAw

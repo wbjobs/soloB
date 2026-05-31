@@ -1,0 +1,428 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  name        String
+  parentId    String?
+  description String?
+  parent      Organization? @relation("OrganizationChildren", fields: [parentId], references: [id])
+  children    Organization[] @relation("OrganizationChildren")
+  users       User[]
+  roles       Role[]
+  applications Application[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([parentId])
+}
+
+model Role {
+  id              String   @id @default(uuid())
+  name            String
+  organizationId  String
+  description     String?
+  permissions     Json     @default("[]")
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  users           User[]
+  pagePermissions PagePermission[]
+  buttonPermissions ButtonPermission[]
+  dataPermissions DataPermission[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model User {
+  id             String   @id @default(uuid())
+  username       String   @unique
+  email          String   @unique
+  passwordHash   String
+  organizationId String
+  roles          Role[]
+  isActive       Boolean  @default(true)
+  lastLoginAt    DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  deployments    Deployment[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+model Application {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  organizationId   String
+  createdBy        String
+  currentVersionId String?
+  status           String   @default("draft")
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  versions         ApplicationVersion[]
+  environments     Environment[]
+  pageSchemas      PageSchema[]
+  dataModels       DataModelDb[]
+  workflows        WorkflowDefinitionDb[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model ApplicationVersion {
+  id              String   @id @default(uuid())
+  applicationId   String
+  version         String
+  description     String?
+  pageSchemasJson Json
+  dataModelsJson  Json
+  workflowsJson   Json
+  application     Application @relation(fields: [applicationId], references: [id])
+  deployments     Deployment[]
+  createdAt       DateTime @default(now())
+
+  @@index([applicationId])
+}
+
+model Environment {
+  id               String   @id @default(uuid())
+  name             String
+  type             String
+  applicationId    String
+  currentVersionId String?
+  configuration    Json     @default("{}")
+  application      Application @relation(fields: [applicationId], references: [id])
+  deployments      Deployment[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([applicationId])
+}
+
+model Deployment {
+  id                   String   @id @default(uuid())
+  environmentId        String
+  versionId            String
+  status               String   @default("pending")
+  deployedBy           String
+  deployedAt           DateTime?
+  errorMessage         String?
+  kubernetesNamespace  String?
+  environment          Environment @relation(fields: [environmentId], references: [id])
+  version              ApplicationVersion @relation(fields: [versionId], references: [id])
+  user                 User @relation(fields: [deployedBy], references: [id])
+  createdAt            DateTime @default(now())
+
+  @@index([environmentId])
+  @@index([versionId])
+}
+
+model PageSchema {
+  id             String   @id @default(uuid())
+  applicationId  String
+  name           String
+  path           String
+  title          String?
+  description    String?
+  componentsJson Json
+  stateVariables Json     @default("{}")
+  isLayout       Boolean  @default(false)
+  layoutId       String?
+  application    Application @relation(fields: [applicationId], references: [id])
+  permissions    PagePermission[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([applicationId])
+  @@unique([applicationId, path])
+}
+
+model PagePermission {
+  id        String     @id @default(uuid())
+  pageId    String
+  roleId    String
+  canView   Boolean    @default(false)
+  canEdit   Boolean    @default(false)
+  page      PageSchema @relation(fields: [pageId], references: [id])
+  role      Role       @relation(fields: [roleId], references: [id])
+  createdAt DateTime   @default(now())
+
+  @@unique([pageId, roleId])
+}
+
+model ButtonPermission {
+  id        String   @id @default(uuid())
+  pageId    String
+  buttonId  String
+  roleId    String
+  enabled   Boolean  @default(true)
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([pageId, buttonId, roleId])
+}
+
+model DataModelDb {
+  id             String   @id @default(uuid())
+  applicationId  String
+  name           String
+  tableName      String
+  description    String?
+  fieldsJson     Json
+  relationsJson  Json     @default("[]")
+  indexesJson    Json     @default("[]")
+  application    Application @relation(fields: [applicationId], references: [id])
+  permissions    DataPermission[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([applicationId])
+  @@unique([applicationId, tableName])
+}
+
+model DataPermission {
+  id          String        @id @default(uuid())
+  dataModelId String
+  roleId      String
+  condition   String        @default("")
+  dataModel   DataModelDb   @relation(fields: [dataModelId], references: [id])
+  role        Role          @relation(fields: [roleId], references: [id])
+  createdAt   DateTime      @default(now())
+
+  @@unique([dataModelId, roleId])
+}
+
+model WorkflowDefinitionDb {
+  id            String   @id @default(uuid())
+  applicationId String
+  name          String
+  description   String?
+  nodesJson     Json
+  edgesJson     Json
+  version       String   @default("1.0.0")
+  status        String   @default("draft")
+  application   Application @relation(fields: [applicationId], references: [id])
+  instances     WorkflowInstance[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([applicationId])
+}
+
+model WorkflowInstance {
+  id           String              @id @default(uuid())
+  definitionId String
+  status       String              @default("running")
+  currentNodes Json                @default("[]")
+  tokens       Json                @default("[]")
+  variables    Json                @default("{}")
+  startedBy    String
+  definition   WorkflowDefinitionDb @relation(fields: [definitionId], references: [id])
+  tasks        WorkflowTask[]
+  startedAt    DateTime            @default(now())
+  endedAt      DateTime?
+
+  @@index([definitionId])
+}
+
+model WorkflowTask {
+  id         String           @id @default(uuid())
+  instanceId String
+  nodeId     String
+  assignee   String?
+  candidates Json             @default("[]")
+  status     String           @default("ready")
+  dueDate    DateTime?
+  instance   WorkflowInstance @relation(fields: [instanceId], references: [id])
+  createdAt  DateTime         @default(now())
+  completedAt DateTime?
+
+  @@index([instanceId])
+  @@index([assignee])
+}
+
+model CustomComponent {
+  id              String   @id @default(uuid())
+  organizationId  String
+  name            String
+  displayName     String
+  description     String?
+  category        String   @default("custom")
+  version         String   @default("1.0.0")
+  packageType     String   @default("umd")
+  umdUrl          String?
+  npmPackage      String?
+  npmVersion      String?
+  propsDefinition Json     @default("[]")
+  eventsDefinition Json    @default("[]")
+  slotsDefinition Json     @default("[]")
+  previewImage    String?
+  documentation   String?
+  tags            Json     @default("[]")
+  isPublic        Boolean  @default(false)
+  isDeprecated    Boolean  @default(false)
+  downloads       Int      @default(0)
+  createdBy       String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  versions        CustomComponentVersion[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([category])
+  @@unique([organizationId, name, version])
+}
+
+model CustomComponentVersion {
+  id              String          @id @default(uuid())
+  componentId     String
+  version         String
+  changelog       String?
+  umdUrl          String?
+  npmVersion      String?
+  isLatest        Boolean         @default(false)
+  component       CustomComponent @relation(fields: [componentId], references: [id])
+  createdAt       DateTime        @default(now())
+
+  @@index([componentId])
+  @@unique([componentId, version])
+}
+
+model DataSource {
+  id              String   @id @default(uuid())
+  organizationId  String
+  applicationId   String?
+  name            String
+  displayName     String
+  type            String
+  configuration   Json     @default("{}")
+  status          String   @default("inactive")
+  isDefault       Boolean  @default(false)
+  createdBy       String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  application     Application? @relation(fields: [applicationId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([applicationId])
+  @@unique([organizationId, name])
+}
+
+model CollaborativeSession {
+  id               String   @id @default(uuid())
+  resourceId       String
+  resourceType     String
+  organizationId   String
+  isActive         Boolean  @default(true)
+  lastActivityAt   DateTime @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  participants     CollaborativeParticipant[]
+  operations       CollaborativeOperation[]
+  createdAt        DateTime @default(now())
+
+  @@index([resourceId, resourceType])
+  @@index([organizationId])
+  @@unique([resourceId, resourceType, organizationId])
+}
+
+model CollaborativeParticipant {
+  id           String               @id @default(uuid())
+  sessionId    String
+  userId       String
+  cursorX      Float?
+  cursorY      Float?
+  selection    Json?
+  isOnline     Boolean              @default(true)
+  lastSeenAt   DateTime             @default(now())
+  color        String
+  session      CollaborativeSession @relation(fields: [sessionId], references: [id])
+  user         User                 @relation(fields: [userId], references: [id])
+  createdAt    DateTime             @default(now())
+
+  @@index([sessionId])
+  @@index([userId])
+  @@unique([sessionId, userId])
+}
+
+model CollaborativeOperation {
+  id           String               @id @default(uuid())
+  sessionId    String
+  userId       String
+  operationType String
+  data         Json
+  version      Int
+  parentId     String?
+  session      CollaborativeSession @relation(fields: [sessionId], references: [id])
+  createdAt    DateTime             @default(now())
+
+  @@index([sessionId])
+  @@index([sessionId, version])
+}
+
+model AIPrompt {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  category       String
+  prompt         String
+  responseFormat String?
+  isPublic       Boolean  @default(false)
+  usageCount     Int      @default(0)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([category])
+}
+
+model AIConversation {
+  id             String   @id @default(uuid())
+  organizationId String
+  userId         String
+  applicationId  String?
+  title          String
+  messages       Json     @default("[]")
+  context        Json     @default("{}")
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
+  application    Application? @relation(fields: [applicationId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([applicationId])
+}
+
+model AIGeneratedContent {
+  id               String   @id @default(uuid())
+  organizationId   String
+  userId           String
+  applicationId    String?
+  conversationId   String?
+  contentType      String
+  generatedContent Json
+  sourcePrompt     String?
+  feedback         String?
+  rating           Int?
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  user             User     @relation(fields: [userId], references: [id])
+  application      Application? @relation(fields: [applicationId], references: [id])
+  conversation     AIConversation? @relation(fields: [conversationId], references: [id])
+  createdAt        DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([applicationId])
+}
