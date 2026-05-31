@@ -1,0 +1,89 @@
+{
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devPath": "../src",
+    "distDir": "../src"
+  },
+  "package": {
+    "productName": "TauriTrayNotify",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "notification": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "Utility",
+      "copyright": "",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
+      "icon": [],
+      "identifier": "com.tauri.traynotify",
+      "longDescription": "",
+      "macOS": {
+        "entitlements": null,
+        "exceptionDomain": "",
+        "frameworks": [],
+        "providerShortName": null,
+        "signingIdentity": null
+      },
+      "resources": [],
+      "shortDescription": "",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "cli": {
+      "description": "Tauri Tray Notify Application",
+      "args": [
+        {
+          "name": "notify",
+          "short": "n",
+          "long": "notify",
+          "takesValue": true,
+          "multipleOccurrences": false,
+          "description": "Send a notification to the running application"
+        },
+        {
+          "name": "title",
+          "long": "title",
+          "takesValue": true,
+          "multipleOccurrences": false,
+          "description": "Title for the notification"
+        }
+      ]
+    },
+    "security": {
+      "csp": null
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
+    "updater": {
+      "active": false
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 400,
+        "resizable": true,
+        "title": "Tauri Tray Notify",
+        "width": 600,
+        "decorations": true,
+        "center": true,
+        "visible": true
+      }
+    ]
+  }
+}
